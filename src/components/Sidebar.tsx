@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Database, Settings, Home, ChevronLeft, Menu, Plane, Upload, Zap, X, CheckSquare, FileText } from 'lucide-react'
+import { Database, Settings, Home, ChevronLeft, Menu, Plane, Upload, Zap, X, CheckSquare, FileText, User, LogOut } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SidebarProps {
   activeTab: string
@@ -10,6 +11,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
+  const { user, signOut } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -63,6 +65,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen)
+  }
+
+  const handleSignOut = async () => {
+    if (window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
+      await signOut()
+    }
+  }
+
+  const getUserInitials = (user: any) => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name
+        .split(' ')
+        .map((name: string) => name[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    }
+    if (user?.email) {
+      return user.email[0].toUpperCase()
+    }
+    return 'U'
   }
 
   // Mobile Menu Button (visible only on mobile)
@@ -157,13 +180,22 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
           <div className="p-4 border-t border-gray-200 dark:border-gray-800">
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">A</span>
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">{getUserInitials(user)}</span>
                 </div>
                 <div>
-                  <p className="text-gray-900 dark:text-white text-sm font-medium">Admin</p>
+                  <p className="text-gray-900 dark:text-white text-sm font-medium">
+                    {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur'}
+                  </p>
                   <p className="text-gray-500 dark:text-gray-400 text-xs">En ligne</p>
                 </div>
+                <button
+                  onClick={handleSignOut}
+                  className="ml-auto p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Se déconnecter"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -267,14 +299,25 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
       <div className={`${isCollapsed ? 'p-2' : 'p-4'} border-t border-gray-200 dark:border-gray-800`}>
         <div className={`bg-gray-50 dark:bg-gray-800 rounded-lg ${isCollapsed ? 'p-2' : 'p-3'} transition-colors duration-300`}>
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3'}`}>
-            <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-sm font-medium">A</span>
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-sm font-medium">{getUserInitials(user)}</span>
             </div>
             {!isCollapsed && (
-              <div className="overflow-hidden">
-                <p className="text-gray-900 dark:text-white text-sm font-medium whitespace-nowrap">Admin</p>
+              <div className="overflow-hidden flex-1">
+                <p className="text-gray-900 dark:text-white text-sm font-medium whitespace-nowrap">
+                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur'}
+                </p>
                 <p className="text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">En ligne</p>
               </div>
+            )}
+            {!isCollapsed && (
+              <button
+                onClick={handleSignOut}
+                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                title="Se déconnecter"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>

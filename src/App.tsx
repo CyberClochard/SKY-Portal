@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { AuthProvider } from './contexts/AuthContext'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 import Sidebar from './components/Sidebar'
 import Dashboard from './components/Dashboard'
 import DataTable from './components/DataTable'
@@ -9,6 +11,7 @@ import AWBValidation from './components/AWBValidation'
 import BookingConfirmationTool from './components/BookingConfirmationTool'
 import Roadmap from './components/Roadmap'
 import Settings from './components/Settings'
+import UserProfile from './components/UserProfile'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -35,28 +38,34 @@ function App() {
         return <Roadmap />
       case 'settings':
         return <Settings />
+      case 'profile':
+        return <UserProfile />
       default:
         return <Dashboard />
     }
   }
 
   return (
-    <ThemeProvider>
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex transition-colors duration-300">
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
-          isCollapsed={sidebarCollapsed}
-          setIsCollapsed={setSidebarCollapsed}
-        />
-        <main className="flex-1 overflow-auto">
-          {/* Mobile padding to account for floating menu button */}
-          <div className="p-4 md:p-8 pt-20 md:pt-8">
-            {renderContent()}
+    <AuthProvider>
+      <ThemeProvider>
+        <ProtectedRoute>
+          <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex transition-colors duration-300">
+            <Sidebar 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab}
+              isCollapsed={sidebarCollapsed}
+              setIsCollapsed={setSidebarCollapsed}
+            />
+            <main className="flex-1 overflow-auto">
+              {/* Mobile padding to account for floating menu button */}
+              <div className="p-4 md:p-8 pt-20 md:pt-8">
+                {renderContent()}
+              </div>
+            </main>
           </div>
-        </main>
-      </div>
-    </ThemeProvider>
+        </ProtectedRoute>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
 
