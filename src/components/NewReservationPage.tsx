@@ -63,9 +63,9 @@ const NewReservationPage: React.FC<NewReservationPageProps> = ({ n8nBaseUrl }) =
 
   // Get client email variables
   const getClientVariables = () => {
-    const clientMail = olivierRahmetData.client === 'PF Olivier' 
+    const clientMail = olivierRahmetData.client === 'PF OLIVIER' 
       ? 'olivierfcf@gmail.com,karasu.seyithan@icloud.com,eroglu9104@gmail.com,adem-yilmaz@outlook.fr'
-      : olivierRahmetData.client === 'PF Rahmet'
+      : olivierRahmetData.client === 'PF RAHMET'
       ? 'pfrahmet@gmail.com'
       : ''
     
@@ -121,7 +121,7 @@ const NewReservationPage: React.FC<NewReservationPageProps> = ({ n8nBaseUrl }) =
 
       console.log('Envoi des données Olivier/Rahmet:', webhookData)
 
-      const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/8ca35e2a-cb37-46ae-bb74-36c983d172d6'
+      const webhookUrl = 'https://n8n.skylogistics.fr/webhook/8ca35e2a-cb37-46ae-bb74-36c983d172d6'
       
       const response = await fetch(webhookUrl, {
         method: 'POST',
@@ -289,8 +289,8 @@ const NewReservationPage: React.FC<NewReservationPageProps> = ({ n8nBaseUrl }) =
                     disabled={isSubmittingOlivierRahmet}
                   >
                     <option value="">Sélectionner un client</option>
-                    <option value="PF Olivier">PF OLIVIER</option>
-                    <option value="PF Rahmet">PF RAHMET</option>
+                    <option value="PF OLIVIER">PF OLIVIER</option>
+                    <option value="PF RAHMET">PF RAHMET</option>
                   </select>
                 </div>
               </div>
