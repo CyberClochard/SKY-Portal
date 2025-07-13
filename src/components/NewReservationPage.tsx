@@ -289,8 +289,8 @@ const NewReservationPage: React.FC<NewReservationPageProps> = ({ n8nBaseUrl }) =
                     disabled={isSubmittingOlivierRahmet}
                   >
                     <option value="">Sélectionner un client</option>
-                    <option value="PF Olivier">PF Olivier</option>
-                    <option value="PF Rahmet">PF Rahmet</option>
+                    <option value="PF Olivier">PF OLIVIER</option>
+                    <option value="PF Rahmet">PF RAHMET</option>
                   </select>
                 </div>
               </div>
