@@ -95,16 +95,6 @@ const DataTable: React.FC = () => {
     }
   }
 
-  // Generate new dossier number
-  const generateDossierNumber = () => {
-    const now = new Date()
-    const year = now.getFullYear().toString().slice(-2)
-    const month = (now.getMonth() + 1).toString().padStart(2, '0')
-    const day = now.getDate().toString().padStart(2, '0')
-    const time = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0')
-    return `AE${year}/${month}${day}${time}`
-  }
-
   // Initialize new dossier form
   const initializeNewDossier = () => {
     const today = new Date().toISOString().split('T')[0]
@@ -142,32 +132,20 @@ const DataTable: React.FC = () => {
     setError(null)
 
     try {
-      // Generate dossier number automatically
-      const dossierNumber = generateDossierNumber()
-      const today = new Date().toISOString().split('T')[0]
+      // Prepare data with only user-provided fields
+      const userData = {}
       
-      // Prepare complete data with auto-generated fields
-      const completeData = {
-        DOSSIER: dossierNumber,
-        DATE: newDossierData.DATE,
-        DATE2: today,
-        CLIENT: newDossierData.CLIENT,
-        DEPART: newDossierData.DEPART,
-        ARRIVEE: newDossierData.ARRIVEE,
-        LTA: newDossierData.LTA,
-        TYPE: newDossierData.TYPE,
-        EXPEDITEUR: newDossierData.CLIENT, // Use client name as expediteur
-        DESTINATAIRE: newDossierData.CLIENT, // Use client name as destinataire
-        POIDS: '0',
-        PIECES: '1',
-        STATUS: 'En cours',
-        NETPAYABLE: '0',
-        FLIGHT: ''
-      }
+      // Only include fields that have values
+      if (newDossierData.DATE) userData.DATE = newDossierData.DATE
+      if (newDossierData.CLIENT) userData.CLIENT = newDossierData.CLIENT
+      if (newDossierData.DEPART) userData.DEPART = newDossierData.DEPART
+      if (newDossierData.ARRIVEE) userData.ARRIVEE = newDossierData.ARRIVEE
+      if (newDossierData.LTA) userData.LTA = newDossierData.LTA
+      if (newDossierData.TYPE) userData.TYPE = newDossierData.TYPE
 
       const { data: insertedData, error: insertError } = await supabase
         .from('MASTER')
-        .insert([completeData])
+        .insert([userData])
         .select()
 
       if (insertError) {
