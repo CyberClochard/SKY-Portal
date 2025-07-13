@@ -121,6 +121,130 @@ const NewReservationPage: React.FC<NewReservationPageProps> = ({ n8nBaseUrl }) =
 
       console.log('Envoi des données Olivier/Rahmet:', webhookData)
 
+      const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/8ca35e2a-cb37-46ae-bb74-36c983d172d6'
+      
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(webhookData)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Erreur webhook: ${response.status} ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log('Réponse webhook Olivier/Rahmet:', result)
+
+      setOlivierRahmetSuccess(`Réservation créée avec succès pour ${olivierRahmetData.nomDefunt}`)
+      
+      // Reset form
+      setOlivierRahmetData({
+        compagnie: '',
+        client: '',
+        nomDefunt: '',
+        aeroportDepart: '',
+        aeroportArrivee: '',
+        vol1: '',
+        dateVol1: '',
+        vol2: '',
+        dateVol2: '',
+        destinataire: '',
+        telephone: '+90'
+      })
+
+    } catch (err) {
+      console.error('Erreur Olivier/Rahmet:', err)
+      setOlivierRahmetError(err instanceof Error ? err.message : 'Erreur inconnue')
+    } finally {
+      setIsSubmittingOlivierRahmet(false)
+      setTimeout(() => setOlivierRahmetSuccess(null), 5000)
+    }
+  }
+
+  // Handle company change and auto-fill departure airport
+  const handleCompagnieChange = (compagnie: string) => {
+    const aeroportDepart = compagnie === 'Pegasus Airlines' ? 'ORY' : compagnie === 'Turkish Airlines' ? 'CDG' : ''
+    setOlivierRahmetData(prev => ({
+      ...prev,
+      compagnie,
+      aeroportDepart
+    }))
+  }
+
+  // Handle phone input to maintain +90 prefix
+  const handleTelephoneChange = (value: string) => {
+    if (!value.startsWith('+90')) {
+      value = '+90' + value.replace(/^\+90/, '')
+    }
+    setOlivierRahmetData(prev => ({
+      ...prev,
+      telephone: value
+    }))
+  }
+
+  // Get client email variables
+  const getClientVariables = () => {
+    const clientMail = olivierRahmetData.client === 'PF Olivier' 
+      ? 'olivierfcf@gmail.com,karasu.seyithan@icloud.com,eroglu9104@gmail.com,adem-yilmaz@outlook.fr'
+      : olivierRahmetData.client === 'PF Rahmet'
+      ? 'pfrahmet@gmail.com'
+      : ''
+    
+    return {
+      clientMail,
+      skyMail: 'reservation@skymasters.fr'
+    }
+  }
+
+  // Submit Olivier/Rahmet form
+  const handleOlivierRahmetSubmit = async () => {
+    setIsSubmittingOlivierRahmet(true)
+    setOlivierRahmetError(null)
+    setOlivierRahmetSuccess(null)
+
+    // Validation
+    const requiredFields = ['compagnie', 'client', 'nomDefunt', 'aeroportDepart', 'aeroportArrivee', 'vol1', 'dateVol1']
+    const missingFields = requiredFields.filter(field => !olivierRahmetData[field])
+    
+    if (missingFields.length > 0) {
+      setOlivierRahmetError(`Champs requis manquants: ${missingFields.join(', ')}`)
+      setIsSubmittingOlivierRahmet(false)
+      return
+    }
+
+    try {
+      const variables = getClientVariables()
+      
+      // Prepare data for webhook
+      const webhookData = {
+        // Form data
+        compagnie: olivierRahmetData.compagnie,
+        client: olivierRahmetData.client,
+        nomDefunt: olivierRahmetData.nomDefunt,
+        aeroportDepart: olivierRahmetData.aeroportDepart,
+        aeroportArrivee: olivierRahmetData.aeroportArrivee.toUpperCase(),
+        vol1: olivierRahmetData.vol1.toUpperCase(),
+        dateVol1: olivierRahmetData.dateVol1,
+        vol2: olivierRahmetData.vol2.toUpperCase(),
+        dateVol2: olivierRahmetData.dateVol2,
+        destinataire: olivierRahmetData.destinataire,
+        telephone: olivierRahmetData.telephone,
+        
+        // Variables
+        clientMail: variables.clientMail,
+        skyMail: variables.skyMail,
+        
+        // Metadata
+        timestamp: new Date().toISOString(),
+        source: 'SkyLogistics Dashboard - Olivier/Rahmet',
+        formType: 'olivier-rahmet'
+      }
+
+      console.log('Envoi des données Olivier/Rahmet:', webhookData)
+
       // TODO: Replace with actual webhook URL when available
       const webhookUrl = 'https://n8n.skylogistics.fr/webhook/olivier-rahmet-reservation'
       
