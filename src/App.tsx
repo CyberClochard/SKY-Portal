@@ -8,8 +8,9 @@ import DataTable from './components/DataTable'
 import FlightSearch from './components/FlightSearch'
 import CassFileProcessor from './components/CassFileProcessor'
 import AWBValidation from './components/AWBValidation'
+import ReservationForm from './components/ReservationForm'
+import NewReservationPage from './components/NewReservationPage'
 import BookingConfirmationTool from './components/BookingConfirmationTool'
-import Roadmap from './components/Roadmap'
 import Settings from './components/Settings'
 import UserProfile from './components/UserProfile'
 
@@ -32,10 +33,10 @@ function App() {
         return <CassFileProcessor n8nBaseUrl={n8nBaseUrl} />
       case 'awb-validation':
         return <AWBValidation />
+      case 'new-reservation':
+        return <NewReservationPage n8nBaseUrl={n8nBaseUrl} />
       case 'booking-confirmation':
         return <BookingConfirmationTool />
-      case 'roadmap':
-        return <Roadmap />
       case 'settings':
         return <Settings />
       case 'profile':
