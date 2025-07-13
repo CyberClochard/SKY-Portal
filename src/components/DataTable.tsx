@@ -8,21 +8,12 @@ interface MasterRecord {
 }
 
 interface NewDossierFormData {
-  DOSSIER: string
   DATE: string
-  DATE2: string
   CLIENT: string
   DEPART: string
   ARRIVEE: string
   LTA: string
   TYPE: string
-  EXPEDITEUR: string
-  DESTINATAIRE: string
-  POIDS: string
-  PIECES: string
-  STATUS: string
-  NETPAYABLE: string
-  FLIGHT: string
   [key: string]: string
 }
 
@@ -46,21 +37,12 @@ const DataTable: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [showNewDossierModal, setShowNewDossierModal] = useState(false)
   const [newDossierData, setNewDossierData] = useState<NewDossierFormData>({
-    DOSSIER: '',
     DATE: '',
-    DATE2: '',
     CLIENT: '',
     DEPART: '',
     ARRIVEE: '',
     LTA: '',
     TYPE: '',
-    EXPEDITEUR: '',
-    DESTINATAIRE: '',
-    POIDS: '',
-    PIECES: '',
-    STATUS: '',
-    NETPAYABLE: '',
-    FLIGHT: ''
   })
   const [creatingDossier, setCreatingDossier] = useState(false)
 
@@ -127,21 +109,12 @@ const DataTable: React.FC = () => {
   const initializeNewDossier = () => {
     const today = new Date().toISOString().split('T')[0]
     setNewDossierData({
-      DOSSIER: generateDossierNumber(),
       DATE: today,
-      DATE2: today,
       CLIENT: '',
       DEPART: '',
       ARRIVEE: '',
       LTA: '',
       TYPE: 'Standard',
-      EXPEDITEUR: '',
-      DESTINATAIRE: '',
-      POIDS: '0',
-      PIECES: '1',
-      STATUS: 'En cours',
-      NETPAYABLE: '0',
-      FLIGHT: ''
     })
     setShowNewDossierModal(true)
   }
@@ -157,7 +130,7 @@ const DataTable: React.FC = () => {
   // Create new dossier
   const createNewDossier = async () => {
     // Validate required fields
-    const requiredFields = ['DOSSIER', 'DATE', 'CLIENT']
+    const requiredFields = ['DATE', 'CLIENT']
     const missingFields = requiredFields.filter(field => !newDossierData[field]?.trim())
     
     if (missingFields.length > 0) {
@@ -169,9 +142,32 @@ const DataTable: React.FC = () => {
     setError(null)
 
     try {
+      // Generate dossier number automatically
+      const dossierNumber = generateDossierNumber()
+      const today = new Date().toISOString().split('T')[0]
+      
+      // Prepare complete data with auto-generated fields
+      const completeData = {
+        DOSSIER: dossierNumber,
+        DATE: newDossierData.DATE,
+        DATE2: today,
+        CLIENT: newDossierData.CLIENT,
+        DEPART: newDossierData.DEPART,
+        ARRIVEE: newDossierData.ARRIVEE,
+        LTA: newDossierData.LTA,
+        TYPE: newDossierData.TYPE,
+        EXPEDITEUR: newDossierData.CLIENT, // Use client name as expediteur
+        DESTINATAIRE: newDossierData.CLIENT, // Use client name as destinataire
+        POIDS: '0',
+        PIECES: '1',
+        STATUS: 'En cours',
+        NETPAYABLE: '0',
+        FLIGHT: ''
+      }
+
       const { data: insertedData, error: insertError } = await supabase
         .from('MASTER')
-        .insert([newDossierData])
+        .insert([completeData])
         .select()
 
       if (insertError) {
@@ -186,21 +182,12 @@ const DataTable: React.FC = () => {
         
         // Reset form
         setNewDossierData({
-          DOSSIER: '',
           DATE: '',
-          DATE2: '',
           CLIENT: '',
           DEPART: '',
           ARRIVEE: '',
           LTA: '',
           TYPE: '',
-          EXPEDITEUR: '',
-          DESTINATAIRE: '',
-          POIDS: '',
-          PIECES: '',
-          STATUS: '',
-          NETPAYABLE: '',
-          FLIGHT: ''
         })
       }
 
@@ -480,19 +467,7 @@ const DataTable: React.FC = () => {
 
             <div className="p-6 space-y-6">
               {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Numéro de Dossier *
-                  </label>
-                  <input
-                    type="text"
-                    value={newDossierData.DOSSIER}
-                    onChange={(e) => handleNewDossierChange('DOSSIER', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="AE25/..."
-                  />
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -502,18 +477,6 @@ const DataTable: React.FC = () => {
                     type="date"
                     value={newDossierData.DATE}
                     onChange={(e) => handleNewDossierChange('DATE', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Date 2
-                  </label>
-                  <input
-                    type="date"
-                    value={newDossierData.DATE2}
-                    onChange={(e) => handleNewDossierChange('DATE2', e.target.value)}
                     className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -586,103 +549,6 @@ const DataTable: React.FC = () => {
                     <option value="Cargo">Cargo</option>
                     <option value="Passenger">Passenger</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Vol
-                  </label>
-                  <input
-                    type="text"
-                    value={newDossierData.FLIGHT}
-                    onChange={(e) => handleNewDossierChange('FLIGHT', e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="AH1006"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Expéditeur
-                  </label>
-                  <input
-                    type="text"
-                    value={newDossierData.EXPEDITEUR}
-                    onChange={(e) => handleNewDossierChange('EXPEDITEUR', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nom de l'expéditeur"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Destinataire
-                  </label>
-                  <input
-                    type="text"
-                    value={newDossierData.DESTINATAIRE}
-                    onChange={(e) => handleNewDossierChange('DESTINATAIRE', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nom du destinataire"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Poids (kg)
-                  </label>
-                  <input
-                    type="number"
-                    value={newDossierData.POIDS}
-                    onChange={(e) => handleNewDossierChange('POIDS', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    step="0.1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Pièces
-                  </label>
-                  <input
-                    type="number"
-                    value={newDossierData.PIECES}
-                    onChange={(e) => handleNewDossierChange('PIECES', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Statut
-                  </label>
-                  <select
-                    value={newDossierData.STATUS}
-                    onChange={(e) => handleNewDossierChange('STATUS', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="En cours">En cours</option>
-                    <option value="Terminé">Terminé</option>
-                    <option value="En attente">En attente</option>
-                    <option value="Annulé">Annulé</option>
-                    <option value="Réservé">Réservé</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Net Payable (€)
-                  </label>
-                  <input
-                    type="number"
-                    value={newDossierData.NETPAYABLE}
-                    onChange={(e) => handleNewDossierChange('NETPAYABLE', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    step="0.01"
-                  />
                 </div>
               </div>
 
