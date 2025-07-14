@@ -464,11 +464,6 @@ const AWBValidation: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
                         {stock.available}
-                        {stock.total > 0 && (
-                          <span className="text-gray-500 dark:text-gray-400 ml-1">
-                            / {stock.total}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
