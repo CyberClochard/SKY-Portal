@@ -141,6 +141,7 @@ const DataTable: React.FC = () => {
       if (newDossierData.DEPART) userData.DEPART = newDossierData.DEPART
       if (newDossierData.ARRIVEE) userData.ARRIVEE = newDossierData.ARRIVEE
       if (newDossierData.LTA) userData.LTA = newDossierData.LTA
+      if (newDossierData.TYPE) userData.TYPE = newDossierData.TYPE
 
       const { data: insertedData, error: insertError } = await supabase
         .from('MASTER')
@@ -510,22 +511,6 @@ const DataTable: React.FC = () => {
                     className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="12412345675"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Type
-                  </label>
-                  <select
-                    value={newDossierData.TYPE}
-                    onChange={(e) => handleNewDossierChange('TYPE', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Standard">Standard</option>
-                    <option value="Express">Express</option>
-                    <option value="Cargo">Cargo</option>
-                    <option value="Passenger">Passenger</option>
-                  </select>
                 </div>
               </div>
 
