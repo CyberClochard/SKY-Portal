@@ -141,7 +141,6 @@ const DataTable: React.FC = () => {
       if (newDossierData.DEPART) userData.DEPART = newDossierData.DEPART
       if (newDossierData.ARRIVEE) userData.ARRIVEE = newDossierData.ARRIVEE
       if (newDossierData.LTA) userData.LTA = newDossierData.LTA
-      if (newDossierData.TYPE) userData.TYPE = newDossierData.TYPE
 
       const { data: insertedData, error: insertError } = await supabase
         .from('MASTER')

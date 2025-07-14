@@ -26,7 +26,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [showDestinationDropdown, setShowDestinationDropdown] = useState(false)
 
   // Supported airports
   const supportedDepartureAirports = [
@@ -55,23 +54,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
     if (success) setSuccess(null)
   }
 
-  const handleDestinationFocus = () => {
-    if (formData.destinationAirport.length === 0) {
-      setShowDestinationDropdown(true)
-    }
-  }
-
-  const handleDestinationBlur = () => {
-    // Delay hiding to allow click on dropdown items
-    setTimeout(() => {
-      setShowDestinationDropdown(false)
-    }, 200)
-  }
-
-  const handleDestinationSelect = (code: string) => {
-    handleInputChange('destinationAirport', code)
-    setShowDestinationDropdown(false)
-  }
 
   const validateForm = (): string[] => {
     const errors: string[] = []
