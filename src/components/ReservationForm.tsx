@@ -278,31 +278,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
                 type="text"
                 value={formData.destinationAirport}
                 onChange={(e) => handleInputChange('destinationAirport', e.target.value.toUpperCase())}
-                onFocus={handleDestinationFocus}
-                onBlur={handleDestinationBlur}
                 placeholder="Code IATA (ex: ALG)"
                 maxLength={3}
                 className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
                 disabled={isSubmitting}
               />
-              {/* Common destinations dropdown */}
-              {showDestinationDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                  <div className="p-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
-                    Destinations courantes:
-                  </div>
-                  {commonDestinations.map(dest => (
-                    <button
-                      key={dest.code}
-                      onClick={() => handleDestinationSelect(dest.code)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-sm text-gray-900 dark:text-white transition-colors"
-                      type="button"
-                    >
-                      <span className="font-mono font-medium">{dest.code}</span> - {dest.name}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
