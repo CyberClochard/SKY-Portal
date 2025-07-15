@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Package, CheckCircle, XCircle, AlertTriangle, RefreshCw, Plus, Calculator, Hash, List, FileText, X, Edit, Trash2, Eye } from 'lucide-react'
-import { getAirlineByPrefix, insertAWBStock, checkAWBExists, getAvailablePrefixes, getAWBStockByPrefix } from '../lib/supabase'
+import { getAirlineByPrefix, insertAWBStock, checkAWBExists, getAvailablePrefixes, getAWBStockByPrefix, updateAWBStock } from '../lib/supabase'
 
 interface AWBSeriesData {
   prefix: string
