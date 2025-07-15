@@ -27,12 +27,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // Supported airports
-  const supportedDepartureAirports = [
-    { code: 'ORY', name: 'Paris-Orly' },
-    { code: 'CDG', name: 'Paris-Charles de Gaulle' }
-  ]
-
   // Common destination airports (examples)
   const commonDestinations = [
     { code: 'ALG', name: 'Alger - Houari Boumediene' },
@@ -64,8 +58,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
     
     if (!formData.departureAirport) {
       errors.push('L\'aéroport de départ est requis')
-    } else if (!['ORY', 'CDG'].includes(formData.departureAirport)) {
-      errors.push('Seuls ORY et CDG sont supportés pour le départ')
+    } else if (formData.departureAirport.length !== 3) {
+      errors.push('Le code aéroport de départ doit contenir 3 lettres')
     }
     
     if (!formData.destinationAirport) {
@@ -252,19 +246,15 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
               <MapPin className="w-4 h-4 inline mr-2" />
               Aéroport de départ *
             </label>
-            <select
+            <input
+              type="text"
               value={formData.departureAirport}
-              onChange={(e) => handleInputChange('departureAirport', e.target.value)}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              onChange={(e) => handleInputChange('departureAirport', e.target.value.toUpperCase())}
+              placeholder="Code IATA (ex: ORY, CDG)"
+              maxLength={3}
+              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
               disabled={isSubmitting}
-            >
-              <option value="">Sélectionner un aéroport</option>
-              {supportedDepartureAirports.map(airport => (
-                <option key={airport.code} value={airport.code}>
-                  {airport.code} - {airport.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Destination Airport */}
@@ -372,7 +362,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
             </p>
             <ul className="text-yellow-700 dark:text-yellow-300 space-y-1">
               <li>• Seule la compagnie Air Algérie est actuellement supportée</li>
-              <li>• Saisissez le code IATA de l'aéroport de départ (ex: ORY, CDG)</li>
+              <li>• Saisissez les codes IATA des aéroports (3 lettres chacun)</li>
               <li>• Un AWB sera automatiquement assigné depuis le stock disponible</li>
               <li>• Une demande de réservation sera envoyée à la compagnie aérienne</li>
             </ul>
