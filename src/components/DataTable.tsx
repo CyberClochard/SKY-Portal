@@ -13,7 +13,7 @@ interface NewDossierFormData {
   DEPART: string
   ARRIVEE: string
   LTA: string
-  TYPE: string
+  TYPE: 'HUM' | 'AIR' | 'SEA' | ''
   [key: string]: string
 }
 
@@ -42,7 +42,7 @@ const DataTable: React.FC = () => {
     DEPART: '',
     ARRIVEE: '',
     LTA: '',
-    TYPE: '',
+    TYPE: 'HUM',
   })
   const [creatingDossier, setCreatingDossier] = useState(false)
 
@@ -165,7 +165,7 @@ const DataTable: React.FC = () => {
           DEPART: '',
           ARRIVEE: '',
           LTA: '',
-          TYPE: '',
+          TYPE: 'HUM',
         })
       }
 
@@ -511,6 +511,21 @@ const DataTable: React.FC = () => {
                     className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="12412345675"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Type *
+                  </label>
+                  <select
+                    value={newDossierData.TYPE}
+                    onChange={(e) => handleNewDossierChange('TYPE', e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="HUM">HUM</option>
+                    <option value="AIR">AIR</option>
+                    <option value="SEA">SEA</option>
+                  </select>
                 </div>
               </div>
 

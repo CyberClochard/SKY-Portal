@@ -50,6 +50,10 @@ const AWBValidation: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null)
   const [stockSummary, setStockSummary] = useState<StockSummary[]>([])
   const [loadingStock, setLoadingStock] = useState(true)
+  const [showStockDetails, setShowStockDetails] = useState<string | null>(null)
+  const [stockDetails, setStockDetails] = useState<any[]>([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [updatingStock, setUpdatingStock] = useState<string | null>(null)
 
   // Get available prefixes (only those with Supabase tables)
   const availablePrefixes = getAvailablePrefixes()
@@ -367,6 +371,43 @@ const AWBValidation: React.FC = () => {
     }
   }
 
+  // Load stock details for a specific prefix
+  const loadStockDetails = async (prefix: string) => {
+    setLoadingDetails(true)
+    try {
+      const stockData = await getAWBStockByPrefix(prefix)
+      setStockDetails(stockData)
+      setShowStockDetails(prefix)
+    } catch (err) {
+      console.error('Error loading stock details:', err)
+      setError('Erreur lors du chargement des détails du stock')
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  // Toggle isUsed status for an AWB
+  const toggleAWBUsed = async (prefix: string, id: string, currentStatus: boolean) => {
+    setUpdatingStock(id)
+    try {
+      await updateAWBStock(prefix, id, { isUsed: !currentStatus })
+      
+      // Refresh stock details
+      await loadStockDetails(prefix)
+      
+      // Refresh stock summary
+      await loadStockSummary()
+      
+      setSuccess(`AWB ${!currentStatus ? 'marqué comme utilisé' : 'marqué comme disponible'}`)
+    } catch (err) {
+      console.error('Error updating AWB status:', err)
+      setError('Erreur lors de la mise à jour du statut AWB')
+    } finally {
+      setUpdatingStock(null)
+      setTimeout(() => setSuccess(null), 3000)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -484,10 +525,16 @@ const AWBValidation: React.FC = () => {
                           <Plus className="w-4 h-4" />
                         </button>
                         <button
-                          className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
+                          onClick={() => loadStockDetails(stock.prefix)}
+                          disabled={loadingDetails}
+                          className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 disabled:opacity-50"
                           title="Voir les détails"
                         >
-                          <Eye className="w-4 h-4" />
+                          {loadingDetails && showStockDetails === stock.prefix ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </td>
