@@ -372,7 +372,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({ n8nBaseUrl }) => {
             </p>
             <ul className="text-yellow-700 dark:text-yellow-300 space-y-1">
               <li>• Seule la compagnie Air Algérie est actuellement supportée</li>
-              <li>• Départs uniquement depuis ORY (Orly) ou CDG (Charles de Gaulle)</li>
+              <li>• Saisissez le code IATA de l'aéroport de départ (ex: ORY, CDG)</li>
               <li>• Un AWB sera automatiquement assigné depuis le stock disponible</li>
               <li>• Une demande de réservation sera envoyée à la compagnie aérienne</li>
             </ul>
