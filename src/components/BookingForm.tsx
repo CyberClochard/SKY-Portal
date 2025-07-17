@@ -1,6 +1,233 @@
 import React, { useState } from 'react';
-import { User, Plane, FileText, Save, Calendar, MapPin, ToggleLeft, ToggleRight } from 'lucide-react';
+import { User, Plane, FileText, Save, Calendar, MapPin, ToggleLeft, ToggleRight, Search, X, RefreshCw } from 'lucide-react';
 import { CaseData } from '../types/booking';
+
+interface FlightAutoCompleteData {
+  carrierCode: string;
+  flightNumber: string;
+  scheduledDepartureDate: string;
+}
+
+interface FlightAutoCompleteModal {
+  isOpen: boolean;
+  flightIndex: number;
+  onClose: () => void;
+  onComplete: (flightIndex: number, data: any) => void;
+}
+
+const FlightAutoCompleteModal: React.FC<FlightAutoCompleteModal> = ({ 
+  isOpen, 
+  flightIndex, 
+  onClose, 
+  onComplete 
+}) => {
+  const [formData, setFormData] = useState<FlightAutoCompleteData>({
+    carrierCode: '',
+    flightNumber: '',
+    scheduledDepartureDate: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleInputChange = (field: keyof FlightAutoCompleteData, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: field === 'carrierCode' ? value.toUpperCase().slice(0, 2) : 
+               field === 'flightNumber' ? value.replace(/\D/g, '').slice(0, 4) : 
+               value
+    }));
+    if (error) setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.carrierCode || formData.carrierCode.length !== 2) {
+      setError('Le code transporteur doit contenir exactement 2 lettres');
+      return;
+    }
+    if (!formData.flightNumber || formData.flightNumber.length === 0) {
+      setError('Le numéro de vol est requis');
+      return;
+    }
+    if (!formData.scheduledDepartureDate) {
+      setError('La date de départ est requise');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const webhookUrl = 'https://n8n.skylogistics.fr/webhook/65c067e4-2c8d-444c-9da1-72e642887de9';
+      
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          carrierCode: formData.carrierCode,
+          flightNumber: formData.flightNumber,
+          scheduledDepartureDate: formData.scheduledDepartureDate,
+          timestamp: new Date().toISOString(),
+          source: 'SkyLogistics Dashboard - Flight AutoComplete'
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur webhook: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Réponse auto-complétion vol:', result);
+
+      if (result.error || result.success === false) {
+        throw new Error(result.message || result.error || 'Erreur lors de la recherche du vol');
+      }
+
+      // Appeler la fonction de complétion avec les données reçues
+      onComplete(flightIndex, result);
+      onClose();
+      
+      // Reset form
+      setFormData({
+        carrierCode: '',
+        flightNumber: '',
+        scheduledDepartureDate: ''
+      });
+
+    } catch (err) {
+      console.error('Erreur auto-complétion vol:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
+      setError(`Erreur lors de la recherche: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setFormData({
+      carrierCode: '',
+      flightNumber: '',
+      scheduledDepartureDate: ''
+    });
+    setError(null);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Search className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Auto-complétion Vol {flightIndex + 1}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">Rechercher les informations de vol</p>
+              </div>
+            </div>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
+              <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Code Transporteur *
+            </label>
+            <input
+              type="text"
+              value={formData.carrierCode}
+              onChange={(e) => handleInputChange('carrierCode', e.target.value)}
+              placeholder="AH, AF, TU..."
+              maxLength={2}
+              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-center"
+              disabled={isLoading}
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">2 lettres majuscules (ex: AH, AF)</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Numéro de Vol *
+            </label>
+            <input
+              type="text"
+              value={formData.flightNumber}
+              onChange={(e) => handleInputChange('flightNumber', e.target.value)}
+              placeholder="1061, 634..."
+              maxLength={4}
+              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-center"
+              disabled={isLoading}
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Maximum 4 chiffres</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Date de Départ Prévue *
+            </label>
+            <input
+              type="date"
+              value={formData.scheduledDepartureDate}
+              onChange={(e) => handleInputChange('scheduledDepartureDate', e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+              required
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={isLoading}
+              className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+            >
+              {isLoading ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
+              <span>{isLoading ? 'Recherche...' : 'Rechercher'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 interface BookingFormProps {
   onSubmit: (data: CaseData) => void;
@@ -9,6 +236,14 @@ interface BookingFormProps {
 }
 
 const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubmitting = false }) => {
+  const [autoCompleteModal, setAutoCompleteModal] = useState<{
+    isOpen: boolean;
+    flightIndex: number;
+  }>({
+    isOpen: false,
+    flightIndex: 0
+  });
+
   // Générer une date par défaut (dans 3 jours)
   const getDefaultDate = () => {
     const date = new Date()
@@ -146,6 +381,54 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
         } : flight
       )
     }));
+  };
+
+  const handleAutoComplete = (flightIndex: number, flightData: any) => {
+    console.log('Auto-complétion reçue pour vol', flightIndex + 1, ':', flightData);
+    
+    // Mapper les données reçues du webhook vers les champs du formulaire
+    // Vous devrez ajuster ce mapping selon la structure exacte de la réponse du webhook
+    const updatedFlight = {
+      ...formData.flights[flightIndex],
+      // Mapping des champs - ajustez selon la réponse de votre webhook
+      airline: flightData.airlineName || flightData.airline || formData.flights[flightIndex].airline,
+      flightNumber: flightData.flightNumber || formData.flights[flightIndex].flightNumber,
+      aircraft: flightData.aircraftType || flightData.aircraft || formData.flights[flightIndex].aircraft,
+      duration: flightData.duration || formData.flights[flightIndex].duration,
+      departure: {
+        ...formData.flights[flightIndex].departure,
+        airport: flightData.departureAirport || flightData.departure?.airport || formData.flights[flightIndex].departure.airport,
+        airportCode: flightData.departureAirportCode || flightData.departure?.airportCode || formData.flights[flightIndex].departure.airportCode,
+        time: flightData.departureTime || flightData.departure?.time || formData.flights[flightIndex].departure.time,
+      },
+      arrival: {
+        ...formData.flights[flightIndex].arrival,
+        airport: flightData.arrivalAirport || flightData.arrival?.airport || formData.flights[flightIndex].arrival.airport,
+        airportCode: flightData.arrivalAirportCode || flightData.arrival?.airportCode || formData.flights[flightIndex].arrival.airportCode,
+        time: flightData.arrivalTime || flightData.arrival?.time || formData.flights[flightIndex].arrival.time,
+      }
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      flights: prev.flights.map((flight, index) => 
+        index === flightIndex ? updatedFlight : flight
+      )
+    }));
+  };
+
+  const openAutoComplete = (flightIndex: number) => {
+    setAutoCompleteModal({
+      isOpen: true,
+      flightIndex
+    });
+  };
+
+  const closeAutoComplete = () => {
+    setAutoCompleteModal({
+      isOpen: false,
+      flightIndex: 0
+    });
   };
 
   const handleDeceasedChange = (field: string, value: string) => {
@@ -289,6 +572,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
               <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">
                 {hasConnection ? 'Vol 1 (Premier segment)' : 'Vol direct'}
               </h4>
+              
+              {/* Auto-Complete Button for Flight 1 */}
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => openAutoComplete(0)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors text-sm"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Auto-complétion</span>
+                </button>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
@@ -470,6 +765,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
                 <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">
                   Vol 2 (Segment de connexion)
                 </h4>
+                
+                {/* Auto-Complete Button for Flight 2 */}
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => openAutoComplete(1)}
+                    className="flex items-center space-x-2 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 rounded-lg transition-colors text-sm"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>Auto-complétion</span>
+                  </button>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
@@ -657,6 +964,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
           </button>
         </div>
       </form>
+
+      {/* Auto-Complete Modal */}
+      <FlightAutoCompleteModal
+        isOpen={autoCompleteModal.isOpen}
+        flightIndex={autoCompleteModal.flightIndex}
+        onClose={closeAutoComplete}
+        onComplete={handleAutoComplete}
+      />
     </div>
   );
 };
