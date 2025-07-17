@@ -293,10 +293,10 @@ const BookingConfirmationTool: React.FC = () => {
                     <span>Modifier</span>
                   </button>
                   
-                  {(htmlContent || documentUrl) && (
+                  {pdfBlob && pdfUrl && (
                     <>
                       <button 
-                        onClick={handleDownloadHtml}
+                        onClick={handleDownloadPdf}
                         className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                       >
                         <Download className="w-4 h-4" />
@@ -304,7 +304,7 @@ const BookingConfirmationTool: React.FC = () => {
                       </button>
                       
                       <button 
-                        onClick={handlePrintHtml}
+                        onClick={handlePrintPdf}
                         className="flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors"
                       >
                         <Printer className="w-4 h-4" />
@@ -317,37 +317,14 @@ const BookingConfirmationTool: React.FC = () => {
             </div>
           </div>
 
-          {/* HTML Viewer */}
-          {htmlContent ? (
+          {/* PDF Viewer */}
+          {pdfBlob && pdfUrl ? (
             <div className="max-w-6xl mx-auto">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                 <div className="bg-gray-50 dark:bg-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                      Aperçu du document HTML
-                    </h3>
-                    <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>Document prêt</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="relative">
-                  <div 
-                    className="w-full min-h-[800px] p-6 bg-white"
-                    dangerouslySetInnerHTML={{ __html: htmlContent }}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : documentUrl ? (
-            <div className="max-w-6xl mx-auto">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                <div className="bg-gray-50 dark:bg-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                      Document externe
+                      Aperçu du document PDF
                     </h3>
                     <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                       <CheckCircle className="w-4 h-4 text-green-500" />
@@ -358,11 +335,11 @@ const BookingConfirmationTool: React.FC = () => {
                 
                 <div className="relative">
                   <iframe
-                    src={documentUrl}
+                    src={pdfUrl}
                     className="w-full h-[800px] border-0"
                     title="Confirmation de Transport Funéraire"
-                    onLoad={() => console.log('Document iframe chargé')}
-                    onError={() => console.error('Erreur de chargement du document iframe')}
+                    onLoad={() => console.log('Document PDF chargé')}
+                    onError={() => console.error('Erreur de chargement du document PDF')}
                   />
                 </div>
               </div>
@@ -378,8 +355,8 @@ const BookingConfirmationTool: React.FC = () => {
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
                   {isGenerating 
-                    ? 'Le document HTML est en cours de génération par le workflow n8n.'
-                    : 'Le document HTML sera affiché ici une fois généré avec succès.'
+                    ? 'Le document PDF est en cours de génération par le workflow n8n.'
+                    : 'Le document PDF sera affiché ici une fois généré avec succès.'
                   }
                 </p>
                 {isGenerating && (
@@ -399,8 +376,8 @@ const BookingConfirmationTool: React.FC = () => {
                   Informations de débogage
                 </summary>
                 <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-                  <p><strong>HTML Content:</strong> {htmlContent ? `${htmlContent.length} caractères` : 'Aucun'}</p>
-                  <p><strong>Document URL:</strong> {documentUrl || 'Aucune'}</p>
+                  <p><strong>PDF Blob:</strong> {pdfBlob ? `${pdfBlob.size} bytes` : 'Aucun'}</p>
+                  <p><strong>PDF URL:</strong> {pdfUrl ? 'Généré' : 'Aucune'}</p>
                   <p><strong>Données actuelles:</strong> {currentData ? 'Présentes' : 'Aucunes'}</p>
                   <p><strong>État génération:</strong> {isGenerating ? 'En cours' : 'Terminé'}</p>
                   <p><strong>Erreur:</strong> {error || 'Aucune'}</p>
