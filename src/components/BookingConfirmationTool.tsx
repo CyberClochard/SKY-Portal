@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Download, Printer, Edit, FileText, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Download, Printer, Edit, FileText, AlertCircle, CheckCircle, RefreshCw, Eye } from 'lucide-react';
 import BookingForm from './BookingForm';
 import { CaseData } from '../types/booking';
 
@@ -338,13 +338,52 @@ const BookingConfirmationTool: React.FC = () => {
                 </div>
                 
                 <div className="relative">
-                  <iframe
-                    src={pdfUrl}
-                    className="w-full h-[800px] border-0"
-                    title="Confirmation de Transport Funéraire"
-                    onLoad={() => console.log('Document PDF chargé')}
-                    onError={() => console.error('Erreur de chargement du document PDF')}
-                  />
+                  {/* PDF Viewer avec fallback */}
+                  <div className="w-full h-[800px] bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+                        <FileText className="w-10 h-10 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          Document PDF généré avec succès
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">
+                          Le document est prêt à être téléchargé ou imprimé.
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                          Taille: {pdfBlob ? `${(pdfBlob.size / 1024).toFixed(1)} KB` : 'Inconnue'}
+                        </p>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button 
+                          onClick={handleDownloadPdf}
+                          className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          <Download className="w-5 h-5" />
+                          <span>Télécharger le PDF</span>
+                        </button>
+                        
+                        <button 
+                          onClick={handlePrintPdf}
+                          className="flex items-center space-x-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors"
+                        >
+                          <Printer className="w-5 h-5" />
+                          <span>Ouvrir et Imprimer</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => window.open(pdfUrl, '_blank')}
+                          className="flex items-center space-x-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                        >
+                          <Eye className="w-5 h-5" />
+                          <span>Ouvrir dans un nouvel onglet</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
