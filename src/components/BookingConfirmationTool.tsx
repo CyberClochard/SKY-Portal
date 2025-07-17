@@ -147,6 +147,11 @@ const BookingConfirmationTool: React.FC = () => {
           throw new Error(result.message || result.error || 'Erreur lors de la génération du document')
         }
         
+        // Vérifier si la réponse est vide
+        if (Object.keys(result).length === 0) {
+          throw new Error('Le webhook n8n a répondu avec un objet vide. Vérifiez que le workflow génère bien un PDF et le renvoie dans la réponse.')
+        }
+        
         if (result.pdfUrl) {
           // URL PDF dans la réponse JSON
           console.log('URL PDF reçue:', result.pdfUrl)
