@@ -85,14 +85,71 @@ const BookingConfirmationTool: React.FC = () => {
       const contentType = response.headers.get('content-type') || '';
       console.log('Type de contenu de la réponse:', contentType);
 
-      // Traiter comme PDF ou JSON
-      if (contentType.includes('application/pdf')) {
-        // Réponse PDF directe
-        console.log('Réception d\'un PDF direct')
+      // Essayer d'abord de traiter comme PDF (priorité au PDF)
+      try {
         const pdfBlob = await response.blob()
-        console.log('Taille du PDF:', pdfBlob.size, 'bytes')
+        console.log('Taille du contenu reçu:', pdfBlob.size, 'bytes')
+        console.log('Type MIME du blob:', pdfBlob.type)
         
-        if (pdfBlob.size > 0) {
+        // Vérifier si c'est vraiment un PDF (par taille et type)
+        if (pdfBlob.size > 1000 && (
+          contentType.includes('application/pdf') || 
+          pdfBlob.type === 'application/pdf' ||
+          contentType.includes('application/octet-stream')
+        )) {
+          // C'est un PDF
+          console.log('PDF détecté et traité')
+          setPdfBlob(pdfBlob)
+          const url = URL.createObjectURL(pdfBlob)
+          setPdfUrl(url)
+          setCurrentData(data)
+          setShowForm(false)
+          setSuccess('Document PDF généré avec succès')
+          return
+        }
+        
+        // Si ce n'est pas un PDF, essayer de traiter comme JSON
+        const responseText = await pdfBlob.text()
+        console.log('Contenu reçu (texte):', responseText.substring(0, 500))
+        
+        let result
+        try {
+          result = JSON.parse(responseText)
+          console.log('Réponse JSON parsée:', result)
+        } catch (parseError) {
+          console.error('Erreur de parsing JSON:', parseError)
+          throw new Error(`Réponse invalide du webhook. Contenu reçu: "${responseText.substring(0, 200)}..."`)
+        }
+        
+        // Traiter la réponse JSON
+        if (result.error || result.success === false) {
+          throw new Error(result.message || result.error || 'Erreur lors de la génération du document')
+        }
+        
+        if (result.pdfUrl) {
+          // URL PDF dans la réponse JSON
+          console.log('URL PDF reçue:', result.pdfUrl)
+          const pdfResponse = await fetch(result.pdfUrl)
+          if (pdfResponse.ok) {
+            const pdfBlob = await pdfResponse.blob()
+            setPdfBlob(pdfBlob)
+            const url = URL.createObjectURL(pdfBlob)
+            setPdfUrl(url)
+            setCurrentData(data)
+            setShowForm(false)
+            setSuccess('Document PDF téléchargé avec succès')
+          } else {
+            throw new Error(`PDF non accessible à l'URL: ${result.pdfUrl}`)
+          }
+        } else if (result.pdfData) {
+          // Données PDF en base64
+          console.log('Données PDF base64 reçues')
+          const binaryString = atob(result.pdfData)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          const pdfBlob = new Blob([bytes], { type: 'application/pdf' })
           setPdfBlob(pdfBlob)
           const url = URL.createObjectURL(pdfBlob)
           setPdfUrl(url)
@@ -100,90 +157,16 @@ const BookingConfirmationTool: React.FC = () => {
           setShowForm(false)
           setSuccess('Document PDF généré avec succès')
         } else {
-          throw new Error('Le PDF reçu est vide')
-        }
-      } else if (contentType.includes('application/json')) {
-        // Réponse JSON
-        const responseText = await response.text();
-        console.log('Réponse JSON brute:', responseText);
-        
-        let result;
-        try {
-          result = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Erreur de parsing JSON:', parseError);
-          throw new Error('Réponse JSON invalide du webhook');
-        }
-        
-        console.log('Résultat JSON du webhook:', result);
-        
-        if (result.pdfUrl) {
-          // URL PDF dans la réponse JSON
-          console.log('URL PDF reçue:', result.pdfUrl)
-          
-          // Télécharger le PDF depuis l'URL
-          try {
-            const pdfResponse = await fetch(result.pdfUrl)
-            if (pdfResponse.ok) {
-              const pdfBlob = await pdfResponse.blob()
-              setPdfBlob(pdfBlob)
-              const url = URL.createObjectURL(pdfBlob)
-              setPdfUrl(url)
-              setCurrentData(data);
-              setShowForm(false);
-              setSuccess('Document PDF généré avec succès')
-            } else {
-              throw new Error(`PDF non accessible à l'URL: ${result.pdfUrl}`)
-            }
-          } catch (urlError) {
-            console.error('Erreur d\'accès à l\'URL PDF:', urlError)
-            throw new Error('Impossible de télécharger le PDF depuis l\'URL fournie')
-          }
-        } else if (result.pdfData) {
-          // Données PDF en base64 dans la réponse JSON
-          console.log('Données PDF base64 reçues')
-          try {
-            const binaryString = atob(result.pdfData)
-            const bytes = new Uint8Array(binaryString.length)
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i)
-            }
-            const pdfBlob = new Blob([bytes], { type: 'application/pdf' })
-            setPdfBlob(pdfBlob)
-            const url = URL.createObjectURL(pdfBlob)
-            setPdfUrl(url)
-            setCurrentData(data)
-            setShowForm(false)
-            setSuccess('Document PDF généré avec succès')
-          } catch (base64Error) {
-            console.error('Erreur de décodage base64:', base64Error)
-            throw new Error('Erreur lors du décodage des données PDF')
-          }
-        } else if (result.success !== false) {
-          // Succès mais pas de PDF
-          console.warn('Succès mais aucun PDF trouvé dans la réponse:', result)
+          // Pas de PDF trouvé dans la réponse
+          console.warn('Aucun PDF trouvé dans la réponse:', result)
           setCurrentData(data)
           setShowForm(false)
-          setError(result.message || 'Document traité avec succès, mais aucun PDF reçu. Vérifiez la configuration du webhook n8n.')
-        } else {
-          throw new Error(result.message || 'Erreur lors de la génération du document')
+          setError(result.message || 'Le workflow a démarré mais aucun PDF n\'a été généré. Vérifiez la configuration du webhook n8n.')
         }
-      } else {
-        // Type de contenu inconnu - essayer de traiter comme PDF
-        console.log('Type de contenu inconnu:', contentType, '- tentative de traitement comme PDF')
-        const pdfBlob = await response.blob()
-        console.log('Contenu reçu:', pdfBlob.size, 'bytes')
         
-        if (pdfBlob.size > 0) {
-          setPdfBlob(pdfBlob)
-          const url = URL.createObjectURL(pdfBlob)
-          setPdfUrl(url)
-          setCurrentData(data);
-          setShowForm(false);
-          setSuccess('Document PDF généré avec succès (type de contenu détecté automatiquement)')
-        } else {
-          throw new Error(`Réponse vide du webhook. Type: ${contentType}`)
-        }
+      } catch (processingError) {
+        console.error('Erreur de traitement de la réponse:', processingError)
+        throw processingError
       }
 
     } catch (err) {
