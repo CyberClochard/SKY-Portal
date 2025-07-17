@@ -84,6 +84,21 @@ const BookingConfirmationTool: React.FC = () => {
       // Vérifier le type de contenu de la réponse
       const contentType = response.headers.get('content-type') || '';
       console.log('Type de contenu de la réponse:', contentType);
+      
+      // Vérifier si c'est une réponse JSON vide malgré un PDF généré
+      if (contentType.includes('application/json') && arrayBuffer.byteLength <= 10) {
+        const textContent = new TextDecoder().decode(arrayBuffer);
+        if (textContent.trim() === '{}' || textContent.trim() === '') {
+          throw new Error(`Le workflow n8n a généré un PDF mais le nœud "Respond to Webhook" est mal configuré. 
+            
+Veuillez vérifier dans n8n :
+1. Le nœud "Respond to Webhook" doit renvoyer le fichier PDF (pas "First Incoming Item")
+2. Configurez "Respond With" vers "Binary File" ou le fichier PDF spécifique
+3. Le PDF généré fait 122 kB et est disponible dans le workflow
+
+Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
+        }
+      }
 
       // Cloner la réponse pour pouvoir la lire plusieurs fois
       const responseClone = response.clone();
