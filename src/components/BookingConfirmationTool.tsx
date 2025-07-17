@@ -68,29 +68,77 @@ const BookingConfirmationTool: React.FC = () => {
       // Envoyer la requête au webhook n8n
       let response;
       try {
-        response = await fetch('https://n8n.skylogistics.fr/webhook/1af37111-e368-4545-a1e5-b07066c5dcaa', {
+        // Test de connectivité préalable
+        console.log('Test de connectivité vers n8n.skylogistics.fr...');
+        
+        const webhookUrl = 'https://n8n.skylogistics.fr/webhook/1af37111-e368-4545-a1e5-b07066c5dcaa';
+        
+        response = await fetch(webhookUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/pdf, application/json, */*'
           },
           body: JSON.stringify(webhookData),
-          // Add timeout and other fetch options
-          signal: AbortSignal.timeout(30000) // 30 second timeout
+          signal: AbortSignal.timeout(45000) // 45 second timeout
         });
+        
+        console.log('Connexion établie avec n8n, statut:', response.status);
+        
       } catch (fetchError) {
         console.error('Erreur de connexion au webhook:', fetchError);
         
+        // Diagnostic détaillé de l'erreur
+        let errorMessage = 'Erreur de connexion au serveur n8n:\n\n';
+        
         if (fetchError instanceof Error) {
-          if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError') {
-            throw new Error('Timeout: Le serveur n8n ne répond pas dans les délais (30s). Vérifiez que le serveur n8n.skylogistics.fr est accessible.');
-          } else if (fetchError.message.includes('Failed to fetch')) {
-            throw new Error('Impossible de se connecter au serveur n8n. Vérifiez:\n• Votre connexion internet\n• Que le serveur n8n.skylogistics.fr est accessible\n• La configuration CORS du serveur n8n');
-          } else if (fetchError.message.includes('NetworkError')) {
-            throw new Error('Erreur réseau: Impossible d\'atteindre le serveur n8n.skylogistics.fr. Vérifiez votre connexion internet.');
+          const errorName = fetchError.name;
+          const errorMsg = fetchError.message;
+          
+          console.log('Type d\'erreur:', errorName, 'Message:', errorMsg);
+          
+          if (errorName === 'AbortError' || errorName === 'TimeoutError') {
+            errorMessage += '⏱️ TIMEOUT (45s dépassé)\n';
+            errorMessage += '• Le serveur n8n met trop de temps à répondre\n';
+            errorMessage += '• Vérifiez que n8n.skylogistics.fr est en ligne\n';
+            errorMessage += '• Le workflow n8n pourrait être bloqué ou très lent\n\n';
+            errorMessage += '🔧 Solutions:\n';
+            errorMessage += '1. Vérifiez l\'état du serveur n8n\n';
+            errorMessage += '2. Optimisez le workflow n8n\n';
+            errorMessage += '3. Augmentez les ressources du serveur';
+          } else if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+            errorMessage += '🌐 PROBLÈME DE CONNECTIVITÉ\n\n';
+            errorMessage += '❌ Impossible d\'atteindre https://n8n.skylogistics.fr\n\n';
+            errorMessage += '🔍 Vérifications nécessaires:\n';
+            errorMessage += '1. ✅ Connexion internet active\n';
+            errorMessage += '2. 🌍 Serveur n8n.skylogistics.fr accessible\n';
+            errorMessage += '3. 🔒 Configuration CORS du serveur n8n\n';
+            errorMessage += '4. 🚫 Pas de blocage par firewall/proxy\n\n';
+            errorMessage += '🛠️ Tests à effectuer:\n';
+            errorMessage += '• Ouvrir https://n8n.skylogistics.fr dans le navigateur\n';
+            errorMessage += '• Vérifier les logs du serveur n8n\n';
+            errorMessage += '• Tester depuis un autre réseau';
+          } else if (errorMsg.includes('CORS')) {
+            errorMessage += '🚫 ERREUR CORS\n\n';
+            errorMessage += 'Le serveur n8n bloque les requêtes cross-origin.\n\n';
+            errorMessage += '🔧 Configuration n8n requise:\n';
+            errorMessage += '• Ajouter "https://localhost:5173" aux origines CORS\n';
+            errorMessage += '• Variable d\'environnement: CORS_ORIGINS\n';
+            errorMessage += '• Redémarrer n8n après modification';
+          } else {
+            errorMessage += `❓ ERREUR INCONNUE\n\n`;
+            errorMessage += `Type: ${errorName}\n`;
+            errorMessage += `Message: ${errorMsg}\n\n`;
+            errorMessage += '🔧 Actions suggérées:\n';
+            errorMessage += '• Vérifier les logs du serveur n8n\n';
+            errorMessage += '• Tester la connectivité réseau\n';
+            errorMessage += '• Contacter l\'administrateur système';
           }
+        } else {
+          errorMessage += `❓ Erreur non identifiée: ${String(fetchError)}`;
         }
         
-        throw new Error(`Erreur de connexion: ${fetchError instanceof Error ? fetchError.message : 'Erreur inconnue'}`);
+        throw new Error(errorMessage);
       }
 
       console.log('Réponse du webhook:', response.status, response.statusText);
