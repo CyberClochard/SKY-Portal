@@ -85,31 +85,40 @@ const BookingConfirmationTool: React.FC = () => {
       const contentType = response.headers.get('content-type') || '';
       console.log('Type de contenu de la réponse:', contentType);
 
-      // Essayer d'abord de traiter comme PDF (priorité au PDF)
+      // Cloner la réponse pour pouvoir la lire plusieurs fois
+      const responseClone = response.clone();
+      
+      // Lire d'abord comme ArrayBuffer pour analyser le contenu
+      const arrayBuffer = await response.arrayBuffer();
+      console.log('Taille du contenu reçu:', arrayBuffer.byteLength, 'bytes');
+      
+      // Vérifier les premiers bytes pour détecter un PDF (signature PDF: %PDF)
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const firstBytes = Array.from(uint8Array.slice(0, 10)).map(b => String.fromCharCode(b)).join('');
+      console.log('Premiers caractères du contenu:', firstBytes);
+      const isPdfSignature = firstBytes.startsWith('%PDF');
+      console.log('Signature PDF détectée:', isPdfSignature);
+      
+      // Si c'est un PDF (par signature ou type de contenu)
+      if (isPdfSignature || contentType.includes('application/pdf')) {
+        console.log('Traitement comme PDF...');
+        const pdfBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
+        console.log('PDF Blob créé:', pdfBlob.size, 'bytes, type:', pdfBlob.type);
+        
+        setPdfBlob(pdfBlob);
+        const url = URL.createObjectURL(pdfBlob);
+        setPdfUrl(url);
+        setCurrentData(data);
+        setShowForm(false);
+        setSuccess('Document PDF généré avec succès');
+        return;
+      }
+      
+      // Sinon, essayer de traiter comme JSON
+      console.log('Pas de PDF détecté, traitement comme JSON...');
       try {
-        const pdfBlob = await response.blob()
-        console.log('Taille du contenu reçu:', pdfBlob.size, 'bytes')
-        console.log('Type MIME du blob:', pdfBlob.type)
-        
-        // Vérifier si c'est vraiment un PDF (par taille et type)
-        if (pdfBlob.size > 1000 && (
-          contentType.includes('application/pdf') || 
-          pdfBlob.type === 'application/pdf' ||
-          contentType.includes('application/octet-stream')
-        )) {
-          // C'est un PDF
-          console.log('PDF détecté et traité')
-          setPdfBlob(pdfBlob)
-          const url = URL.createObjectURL(pdfBlob)
-          setPdfUrl(url)
-          setCurrentData(data)
-          setShowForm(false)
-          setSuccess('Document PDF généré avec succès')
-          return
-        }
-        
-        // Si ce n'est pas un PDF, essayer de traiter comme JSON
-        const responseText = await pdfBlob.text()
+        // Utiliser la réponse clonée pour lire comme texte
+        const responseText = await responseClone.text();
         console.log('Contenu reçu (texte):', responseText.substring(0, 500))
         
         let result
@@ -118,7 +127,19 @@ const BookingConfirmationTool: React.FC = () => {
           console.log('Réponse JSON parsée:', result)
         } catch (parseError) {
           console.error('Erreur de parsing JSON:', parseError)
-          throw new Error(`Réponse invalide du webhook. Contenu reçu: "${responseText.substring(0, 200)}..."`)
+          // Si ce n'est ni PDF ni JSON valide, mais que le contenu semble être du binaire
+          if (arrayBuffer.byteLength > 1000) {
+            console.log('Contenu binaire détecté, tentative de traitement comme PDF...');
+            const pdfBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
+            setPdfBlob(pdfBlob);
+            const url = URL.createObjectURL(pdfBlob);
+            setPdfUrl(url);
+            setCurrentData(data);
+            setShowForm(false);
+            setSuccess('Document PDF généré avec succès (détection binaire)');
+            return;
+          }
+          throw new Error(`Réponse invalide du webhook. Type: ${contentType}, Taille: ${arrayBuffer.byteLength} bytes, Début: "${responseText.substring(0, 200)}..."`)
         }
         
         // Traiter la réponse JSON
