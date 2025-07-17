@@ -66,13 +66,32 @@ const BookingConfirmationTool: React.FC = () => {
       console.log('Envoi des données au webhook n8n:', webhookData);
 
       // Envoyer la requête au webhook n8n
-      const response = await fetch('https://n8n.skylogistics.fr/webhook/1af37111-e368-4545-a1e5-b07066c5dcaa', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(webhookData)
-      });
+      let response;
+      try {
+        response = await fetch('https://n8n.skylogistics.fr/webhook/1af37111-e368-4545-a1e5-b07066c5dcaa', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(webhookData),
+          // Add timeout and other fetch options
+          signal: AbortSignal.timeout(30000) // 30 second timeout
+        });
+      } catch (fetchError) {
+        console.error('Erreur de connexion au webhook:', fetchError);
+        
+        if (fetchError instanceof Error) {
+          if (fetchError.name === 'AbortError' || fetchError.name === 'TimeoutError') {
+            throw new Error('Timeout: Le serveur n8n ne répond pas dans les délais (30s). Vérifiez que le serveur n8n.skylogistics.fr est accessible.');
+          } else if (fetchError.message.includes('Failed to fetch')) {
+            throw new Error('Impossible de se connecter au serveur n8n. Vérifiez:\n• Votre connexion internet\n• Que le serveur n8n.skylogistics.fr est accessible\n• La configuration CORS du serveur n8n');
+          } else if (fetchError.message.includes('NetworkError')) {
+            throw new Error('Erreur réseau: Impossible d\'atteindre le serveur n8n.skylogistics.fr. Vérifiez votre connexion internet.');
+          }
+        }
+        
+        throw new Error(`Erreur de connexion: ${fetchError instanceof Error ? fetchError.message : 'Erreur inconnue'}`);
+      }
 
       console.log('Réponse du webhook:', response.status, response.statusText);
       console.log('Headers de réponse:', Object.fromEntries(response.headers.entries()));
