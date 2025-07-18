@@ -60,7 +60,7 @@ const FlightAutoCompleteModal: React.FC<FlightAutoCompleteModal> = ({
     setError(null);
 
     try {
-      const webhookUrl = 'https://n8n.skylogistics.fr/webhook/65c067e4-2c8d-444c-9da1-72e642887de9';
+      const webhookUrl = 'https://n8n.skylogistics.fr/webhook/4c6e1f03-c2e9-42f3-9359-e9a956eccf5d';
       
       const response = await fetch(webhookUrl, {
         method: 'POST',
