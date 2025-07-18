@@ -101,8 +101,64 @@ const FlightAutoCompleteModal: React.FC<FlightAutoCompleteModal> = ({
 
     } catch (err) {
       console.error('Erreur auto-complétion vol:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
-      setError(`Erreur lors de la recherche: ${errorMessage}`);
+      
+      // Diagnostic détaillé de l'erreur
+      let errorMessage = 'Erreur de connexion au serveur n8n:\n\n';
+      
+      if (err instanceof Error) {
+        const errorName = err.name;
+        const errorMsg = err.message;
+        
+        console.log('Type d\'erreur auto-complétion:', errorName, 'Message:', errorMsg);
+        
+        if (errorName === 'AbortError' || errorName === 'TimeoutError') {
+          errorMessage += '⏱️ TIMEOUT (30s dépassé)\n';
+          errorMessage += '• Le serveur n8n met trop de temps à répondre\n';
+          errorMessage += '• Vérifiez que n8n.skylogistics.fr est en ligne\n';
+          errorMessage += '• Le workflow d\'auto-complétion pourrait être lent\n\n';
+          errorMessage += '🔧 Solutions:\n';
+          errorMessage += '1. Vérifiez l\'état du serveur n8n\n';
+          errorMessage += '2. Optimisez le workflow d\'auto-complétion\n';
+          errorMessage += '3. Réessayez dans quelques instants';
+        } else if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+          errorMessage += '🌐 PROBLÈME DE CONNECTIVITÉ\n\n';
+          errorMessage += '❌ Impossible d\'atteindre https://n8n.skylogistics.fr\n\n';
+          errorMessage += '🔍 Vérifications nécessaires:\n';
+          errorMessage += '1. ✅ Connexion internet active\n';
+          errorMessage += '2. 🌍 Serveur n8n.skylogistics.fr accessible\n';
+          errorMessage += '3. 🔒 Configuration CORS du serveur n8n\n';
+          errorMessage += '4. 🚫 Pas de blocage par firewall/proxy\n\n';
+          errorMessage += '🛠️ Configuration CORS n8n requise:\n';
+          errorMessage += '• Variable: CORS_ORIGINS=https://localhost:5173\n';
+          errorMessage += '• Redémarrer n8n après modification\n\n';
+          errorMessage += '🧪 Tests à effectuer:\n';
+          errorMessage += '• Ouvrir https://n8n.skylogistics.fr dans le navigateur\n';
+          errorMessage += '• Vérifier les logs du serveur n8n\n';
+          errorMessage += '• Tester depuis un autre réseau';
+        } else if (errorMsg.includes('CORS')) {
+          errorMessage += '🚫 ERREUR CORS\n\n';
+          errorMessage += 'Le serveur n8n bloque les requêtes cross-origin.\n\n';
+          errorMessage += '🔧 Configuration n8n requise:\n';
+          errorMessage += '• Ajouter "https://localhost:5173" aux origines CORS\n';
+          errorMessage += '• Variable d\'environnement: CORS_ORIGINS\n';
+          errorMessage += '• Redémarrer n8n après modification\n\n';
+          errorMessage += '📝 Exemple de configuration:\n';
+          errorMessage += 'CORS_ORIGINS=https://localhost:5173,https://yourdomain.com';
+        } else {
+          errorMessage += `❓ ERREUR INCONNUE\n\n`;
+          errorMessage += `Type: ${errorName}\n`;
+          errorMessage += `Message: ${errorMsg}\n\n`;
+          errorMessage += '🔧 Actions suggérées:\n';
+          errorMessage += '• Vérifier les logs du serveur n8n\n';
+          errorMessage += '• Tester la connectivité réseau\n';
+          errorMessage += '• Vérifier l\'URL du webhook\n';
+          errorMessage += '• Contacter l\'administrateur système';
+        }
+      } else {
+        errorMessage += `❓ Erreur non identifiée: ${String(err)}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
