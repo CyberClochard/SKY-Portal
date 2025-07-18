@@ -387,25 +387,43 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
     console.log('Auto-complétion reçue pour vol', flightIndex + 1, ':', flightData);
     
     // Mapper les données reçues du webhook vers les champs du formulaire
-    // Vous devrez ajuster ce mapping selon la structure exacte de la réponse du webhook
+    // Variables reçues: N° de vol, codeDepart, aeroportDepart, dateDepart, heureDepart, 
+    // codeArrivée, aeroportArrivee, dateArrivée, heureArrivee
+    
+    // Fonction helper pour convertir le format de date DD/MM/YYYY vers YYYY-MM-DD
+    const convertDateFormat = (dateStr: string) => {
+      if (!dateStr) return '';
+      // Format reçu: "19/07/2025" -> Format requis: "2025-07-19"
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      return dateStr; // Retourner tel quel si le format n'est pas reconnu
+    };
+
     const updatedFlight = {
       ...formData.flights[flightIndex],
-      // Mapping des champs - ajustez selon la réponse de votre webhook
-      airline: flightData.airlineName || flightData.airline || formData.flights[flightIndex].airline,
-      flightNumber: flightData.flightNumber || formData.flights[flightIndex].flightNumber,
-      aircraft: flightData.aircraftType || flightData.aircraft || formData.flights[flightIndex].aircraft,
-      duration: flightData.duration || formData.flights[flightIndex].duration,
+      // Mapping des champs selon les variables reçues du webhook
+      flightNumber: flightData['N° de vol'] || formData.flights[flightIndex].flightNumber,
+      // Note: airline n'est pas fournie par le webhook, on garde la valeur existante
+      airline: formData.flights[flightIndex].airline,
+      // Note: aircraft et duration ne sont pas fournis, on garde les valeurs existantes
+      aircraft: formData.flights[flightIndex].aircraft,
+      duration: formData.flights[flightIndex].duration,
       departure: {
         ...formData.flights[flightIndex].departure,
-        airport: flightData.departureAirport || flightData.departure?.airport || formData.flights[flightIndex].departure.airport,
-        airportCode: flightData.departureAirportCode || flightData.departure?.airportCode || formData.flights[flightIndex].departure.airportCode,
-        time: flightData.departureTime || flightData.departure?.time || formData.flights[flightIndex].departure.time,
+        airport: flightData.aeroportDepart || formData.flights[flightIndex].departure.airport,
+        airportCode: flightData.codeDepart || formData.flights[flightIndex].departure.airportCode,
+        date: convertDateFormat(flightData.dateDepart) || formData.flights[flightIndex].departure.date,
+        time: flightData.heureDepart || formData.flights[flightIndex].departure.time,
       },
       arrival: {
         ...formData.flights[flightIndex].arrival,
-        airport: flightData.arrivalAirport || flightData.arrival?.airport || formData.flights[flightIndex].arrival.airport,
-        airportCode: flightData.arrivalAirportCode || flightData.arrival?.airportCode || formData.flights[flightIndex].arrival.airportCode,
-        time: flightData.arrivalTime || flightData.arrival?.time || formData.flights[flightIndex].arrival.time,
+        airport: flightData.aeroportArrivee || formData.flights[flightIndex].arrival.airport,
+        airportCode: flightData['codeArrivée'] || formData.flights[flightIndex].arrival.airportCode,
+        date: convertDateFormat(flightData['dateArrivée']) || formData.flights[flightIndex].arrival.date,
+        time: flightData.heureArrivee || formData.flights[flightIndex].arrival.time,
       }
     };
 
