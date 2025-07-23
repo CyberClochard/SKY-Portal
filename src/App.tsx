@@ -13,6 +13,7 @@ import NewReservationPage from './components/NewReservationPage'
 import BookingConfirmationTool from './components/BookingConfirmationTool'
 import Settings from './components/Settings'
 import UserProfile from './components/UserProfile'
+import FacturationPage from './components/FacturationPage'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -37,6 +38,8 @@ function App() {
         return <NewReservationPage n8nBaseUrl={n8nBaseUrl} />
       case 'booking-confirmation':
         return <BookingConfirmationTool />
+      case 'facturation':
+        return <FacturationPage />
       case 'settings':
         return <Settings />
       case 'profile':
