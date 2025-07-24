@@ -67,11 +67,11 @@ const FacturationPage: React.FC = () => {
         </div>
         <div className="flex items-center space-x-3">
           <button 
-            onClick={() => setIsImportModalOpen(true)}
+            onClick={() => console.log('Nouvelle facture')}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>Nouvelle facture</span>
+            <span>Importer</span>
           </button>
         </div>
       </div>
