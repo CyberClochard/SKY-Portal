@@ -1,25 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Supabase configuration for SkyLogistics custom instance
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Using environment variables with fallbacks
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabase.skylogistics.fr'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc1MTEyNTYyMCwiZXhwIjo0OTA2Nzk5MjIwLCJyb2xlIjoiYW5vbiJ9.KtZo2tsCZGadFu2ibWCiBVJ7OI1Ch7VZTELX5HZO97Y'
 
-console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY);
+console.log('=== SUPABASE CONFIGURATION ===');
+console.log('Supabase URL:', supabaseUrl);
+console.log('Supabase Key:', supabaseAnonKey ? '***LOADED***' : 'NOT LOADED');
+console.log('Using env vars:', {
+  url: !!import.meta.env.VITE_SUPABASE_URL,
+  key: !!import.meta.env.VITE_SUPABASE_ANON_KEY
+});
 
 console.log('Supabase Config:', {
   url: supabaseUrl,
   hasKey: !!supabaseAnonKey,
   keyLength: supabaseAnonKey?.length || 0
 })
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
-    url: !!supabaseUrl,
-    key: !!supabaseAnonKey,
-    env: import.meta.env
-  })
-}
 
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
@@ -291,4 +289,124 @@ export const getAllAirlines = async () => {
 
 export interface MasterRecord {
   [key: string]: any
+}
+
+// Function to upload invoice PDF files to Supabase Storage
+export const uploadInvoicePDF = async (file: File, invoiceNumber?: string): Promise<string> => {
+  try {
+    const fileName = invoiceNumber 
+      ? `invoices/${invoiceNumber}_${Date.now()}.pdf`
+      : `invoices/${Date.now()}_${file.name}`
+    
+    const { data, error } = await supabase.storage
+      .from('invoices')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) {
+      console.error('Error uploading file:', error)
+      throw new Error(`Erreur lors de l'upload: ${error.message}`)
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('invoices')
+      .getPublicUrl(fileName)
+
+    console.log('File uploaded successfully:', urlData.publicUrl)
+    return urlData.publicUrl
+  } catch (error) {
+    console.error('Failed to upload invoice PDF:', error)
+    throw error
+  }
+}
+
+// Function to upload multiple invoice PDF files
+export const uploadMultipleInvoicePDFs = async (files: File[]): Promise<string[]> => {
+  const uploadPromises = files.map(file => uploadInvoicePDF(file))
+  return Promise.all(uploadPromises)
+}
+
+// Function to send PDF files to n8n webhook
+export const sendPDFsToWebhook = async (files: File[]): Promise<{ fileName: string; response: string; status: number }[]> => {
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/7ec6deef-007b-4821-a3b4-30559bf5425c'
+  
+  try {
+    console.log(`Envoi de ${files.length} fichiers PDF au webhook n8n`)
+    
+    // Envoyer chaque fichier individuellement et capturer les réponses
+    const sendPromises = files.map(async (file) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('fileName', file.name)
+      formData.append('fileSize', file.size.toString())
+      formData.append('uploadedAt', new Date().toISOString())
+      formData.append('totalFiles', files.length.toString())
+      formData.append('fileIndex', (files.indexOf(file) + 1).toString())
+      
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        body: formData
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
+      }
+      
+      const result = await response.text()
+      console.log(`Fichier ${file.name} envoyé avec succès au webhook`)
+      console.log(`Réponse du webhook pour ${file.name}:`, result)
+      
+      return {
+        fileName: file.name,
+        response: result,
+        status: response.status
+      }
+    })
+    
+    const results = await Promise.all(sendPromises)
+    console.log('Tous les fichiers ont été envoyés au webhook avec succès')
+    return results
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi au webhook:', error)
+    throw new Error(`Erreur lors de l'envoi au webhook: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+  }
+}
+
+// Alternative: Function to send all PDF files in a single request (if webhook supports it)
+export const sendPDFsToWebhookBatch = async (files: File[]): Promise<void> => {
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/7ec6deef-007b-4821-a3b4-30559bf5425c'
+  
+  try {
+    console.log(`Envoi de ${files.length} fichiers PDF au webhook n8n en lot`)
+    
+    const formData = new FormData()
+    formData.append('totalFiles', files.length.toString())
+    formData.append('uploadedAt', new Date().toISOString())
+    
+    // Ajouter tous les fichiers au FormData
+    files.forEach((file, index) => {
+      formData.append(`file_${index}`, file)
+      formData.append(`fileName_${index}`, file.name)
+      formData.append(`fileSize_${index}`, file.size.toString())
+    })
+    
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
+    }
+    
+    const result = await response.text()
+    console.log('Tous les fichiers ont été envoyés au webhook en lot avec succès')
+    return result
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi au webhook en lot:', error)
+    throw new Error(`Erreur lors de l'envoi au webhook: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+  }
 }

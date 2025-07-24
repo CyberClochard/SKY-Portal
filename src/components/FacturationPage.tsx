@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, sendPDFsToWebhook } from '../lib/supabase'
 import { RefreshCw, FileText, AlertCircle, Plus } from 'lucide-react'
+import InvoiceImportModal from './InvoiceImportModal'
 
 const FacturationPage: React.FC = () => {
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -28,6 +30,31 @@ const FacturationPage: React.FC = () => {
     console.log('Clés des factures :', Object.keys(invoices[0]));
   }
 
+  const handleImportInvoices = async (files: File[]) => {
+    try {
+      console.log('Importation de', files.length, 'fichiers PDF')
+      
+      // Envoyer les fichiers PDF au webhook n8n et récupérer les réponses
+      const webhookResponses = await sendPDFsToWebhook(files)
+      console.log('Fichiers envoyés au webhook n8n avec succès')
+      console.log('Réponses du webhook:', webhookResponses)
+      
+      // Recharger les factures après importation
+      const { data, error } = await supabase.from('invoice_summary').select('*')
+      if (error) {
+        throw new Error(error.message)
+      } else {
+        setInvoices(data || [])
+      }
+      
+      // Retourner les réponses du webhook pour affichage dans le modal
+      return webhookResponses
+    } catch (error) {
+      console.error('Erreur lors de l\'importation:', error)
+      throw error
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -40,7 +67,7 @@ const FacturationPage: React.FC = () => {
         </div>
         <div className="flex items-center space-x-3">
           <button 
-            onClick={() => console.log('Nouvelle facture')}
+            onClick={() => setIsImportModalOpen(true)}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -138,6 +165,13 @@ const FacturationPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Import Modal */}
+      <InvoiceImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportInvoices}
+      />
     </div>
   )
 }
