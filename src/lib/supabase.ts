@@ -331,7 +331,7 @@ export const uploadMultipleInvoicePDFs = async (files: File[]): Promise<string[]
 
 // Function to send PDF files to n8n webhook
 export const sendPDFsToWebhook = async (files: File[]): Promise<{ fileName: string; response: string; status: number }[]> => {
-  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/7ec6deef-007b-4821-a3b4-30559bf5425c'
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook/7ec6deef-007b-4821-a3b4-30559bf5425c'
   
   try {
     console.log(`Envoi de ${files.length} fichiers PDF au webhook n8n`)
@@ -377,7 +377,7 @@ export const sendPDFsToWebhook = async (files: File[]): Promise<{ fileName: stri
 
 // Alternative: Function to send all PDF files in a single request (if webhook supports it)
 export const sendPDFsToWebhookBatch = async (files: File[]): Promise<void> => {
-  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/7ec6deef-007b-4821-a3b4-30559bf5425c'
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook/7ec6deef-007b-4821-a3b4-30559bf5425c'
   
   try {
     console.log(`Envoi de ${files.length} fichiers PDF au webhook n8n en lot`)
