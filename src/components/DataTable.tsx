@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Search, Filter, Download, RefreshCw, Eye, Edit, Trash2, Plus, ChevronLeft, ChevronRight, FileText, AlertCircle, Save, X, Check, Settings, Columns, Calendar, User, MapPin, Plane } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import CasePage from './CasePage'
+import CaseModal from './CaseModal'
 
 interface MasterRecord {
   [key: string]: any
@@ -13,8 +13,8 @@ interface NewDossierFormData {
   DEPART: string
   ARRIVEE: string
   LTA: string
-  TYPE: 'HUM' | 'AIR' | 'SEA' | ''
-  [key: string]: string
+  TYPE: 'HUM' | 'AIR' | 'SEA' | 'CARGO' | ''
+  [key: string]: any
 }
 
 const DataTable: React.FC = () => {
@@ -28,7 +28,8 @@ const DataTable: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
-  const [showCasePage, setShowCasePage] = useState<string | null>(null)
+  const [selectedDossier, setSelectedDossier] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [tableColumns, setTableColumns] = useState<string[]>([])
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set())
   const [showColumnSelector, setShowColumnSelector] = useState(false)
@@ -104,7 +105,7 @@ const DataTable: React.FC = () => {
       DEPART: '',
       ARRIVEE: '',
       LTA: '',
-      TYPE: 'Standard',
+      TYPE: 'HUM',
     })
     setShowNewDossierModal(true)
   }
@@ -235,11 +236,13 @@ const DataTable: React.FC = () => {
   }
 
   const handleViewCase = (dossier: string) => {
-    setShowCasePage(dossier)
+    setSelectedDossier(dossier)
+    setIsModalOpen(true)
   }
 
-  const handleBackFromCase = () => {
-    setShowCasePage(null)
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedDossier(null)
   }
 
   const handleEditRow = (record: MasterRecord) => {
@@ -375,13 +378,17 @@ const DataTable: React.FC = () => {
   // Get visible columns array
   const visibleColumnsArray = tableColumns.filter(col => visibleColumns.has(col))
 
-  // If showing case page, render it instead
-  if (showCasePage) {
-    return <CasePage dossier={showCasePage} onBack={handleBackFromCase} />
-  }
-
   return (
     <div className="space-y-6">
+      {/* CaseModal */}
+      {isModalOpen && selectedDossier && (
+        <CaseModal 
+          isOpen={isModalOpen} 
+          dossier={selectedDossier} 
+          onClose={handleCloseModal} 
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
