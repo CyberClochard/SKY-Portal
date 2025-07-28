@@ -44,7 +44,11 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
       // Transformer les données pour inclure les informations du client
       const paymentsWithCustomers = (data || []).map(payment => ({
         ...payment,
-        customer: payment.customers || null
+        customer: payment.customers ? {
+          id: payment.customers.id,
+          name: payment.customers.name,
+          email: payment.customers.email
+        } : null
       }))
 
       setPayments(paymentsWithCustomers)
@@ -81,7 +85,11 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
       // Transformer les données pour inclure les informations du client
       const paymentWithCustomer: PaymentWithCustomer = {
         ...data,
-        customer: data.customers || null
+        customer: data.customers ? {
+          id: data.customers.id,
+          name: data.customers.name,
+          email: data.customers.email
+        } : null
       }
 
       // Rafraîchir la liste des paiements
@@ -117,7 +125,11 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
       // Transformer les données pour inclure les informations du client
       const paymentWithCustomer: PaymentWithCustomer = {
         ...data,
-        customer: data.customers || null
+        customer: data.customers ? {
+          id: data.customers.id,
+          name: data.customers.name,
+          email: data.customers.email
+        } : null
       }
 
       // Rafraîchir la liste des paiements
