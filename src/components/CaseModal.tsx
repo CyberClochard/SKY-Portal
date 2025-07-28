@@ -300,6 +300,18 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
     }
   }, [isOpen, hasChanges, editingData, originalData, ventesData, initialVentesData, achatsPrevisionnels, initialAchatsPrevisionnels, achatsReels, initialAchatsReels, reglements, initialReglements, documents, onClose])
 
+  // Désactiver la molette de souris sur les champs numériques
+  useEffect(() => {
+    const preventWheel = (e: WheelEvent) => {
+      if (e.target instanceof HTMLInputElement && e.target.type === 'number') {
+        e.preventDefault()
+      }
+    }
+
+    document.addEventListener('wheel', preventWheel, { passive: false })
+    return () => document.removeEventListener('wheel', preventWheel)
+  }, [])
+
 
 
   const loadCaseData = async () => {

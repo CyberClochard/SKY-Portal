@@ -53,7 +53,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
     { id: 'awb-validation', icon: CheckSquare, label: 'AWB Stock' },
     { id: 'new-reservation', icon: Plus, label: 'Nouvelle Réservation' },
     { id: 'booking-confirmation', icon: FileText, label: 'Confirmation Réservation' },
-    { id: 'facturation', icon: Euro, label: 'Facturation' }, // Déplacé ici et icône changée
+    { id: 'facturation', icon: Euro, label: 'Facturation' },
+    { id: 'payments', icon: Euro, label: 'Règlements' },
     { id: 'settings', icon: Settings, label: 'Paramètres' },
   ]
 

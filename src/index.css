@@ -543,6 +543,41 @@ body {
 }
 
 /* Print styles */
+/* Désactiver complètement la molette de souris sur les champs numériques */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Empêcher le scroll de la molette sur les champs numériques */
+input[type="number"]:focus {
+  outline: none;
+}
+
+/* Désactiver le scroll de la molette sur tous les champs numériques */
+input[type="number"] {
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Empêcher le scroll de la molette avec JavaScript */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Désactiver le scroll de la molette sur les champs numériques */
+input[type="number"] {
+  scroll-behavior: auto;
+}
+
 @media print {
   .no-print {
     display: none !important;
