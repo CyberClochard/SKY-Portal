@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 -- Table des paiements
 CREATE TABLE IF NOT EXISTS payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id uuid REFERENCES customers(id) ON DELETE CASCADE,
+  customer_id uuid REFERENCES customers(id) ON DELETE CASCADE NOT NULL,
   amount decimal(12,2) NOT NULL,
   payment_method text NOT NULL CHECK (payment_method IN ('transfer', 'check', 'card', 'cash', 'other')),
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
@@ -142,6 +142,8 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Paiement non trouvé: %', payment_uuid;
   END IF;
+  
+  
   
   remaining_amount := payment_record.amount;
   

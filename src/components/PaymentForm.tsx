@@ -61,7 +61,6 @@ const PaymentForm: React.FC<PaymentFormModalProps> = ({ isOpen, onClose, custome
       setError('Veuillez sélectionner un client')
       return false
     }
-
     if (formData.amount <= 0) {
       setError('Le montant doit être supérieur à 0')
       return false

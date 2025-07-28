@@ -12,12 +12,12 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
       setLoading(true)
       setError(null)
 
-      // Récupérer les paiements avec les informations du client
+      // Récupérer les paiements avec les informations du client (LEFT JOIN)
       let query = supabase
         .from('payments')
         .select(`
           *,
-          customers!inner(
+          customers(
             id,
             name,
             email
@@ -44,7 +44,7 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
       // Transformer les données pour inclure les informations du client
       const paymentsWithCustomers = (data || []).map(payment => ({
         ...payment,
-        customer: payment.customers
+        customer: payment.customers || null
       }))
 
       setPayments(paymentsWithCustomers)
@@ -66,15 +66,28 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
           ...paymentData,
           status: 'completed'
         }])
-        .select()
+        .select(`
+          *,
+          customers(
+            id,
+            name,
+            email
+          )
+        `)
         .single()
 
       if (error) throw error
 
+      // Transformer les données pour inclure les informations du client
+      const paymentWithCustomer: PaymentWithCustomer = {
+        ...data,
+        customer: data.customers || null
+      }
+
       // Rafraîchir la liste des paiements
       await fetchPayments()
 
-      return data
+      return paymentWithCustomer
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création du paiement')
       return null
@@ -89,15 +102,28 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
         .from('payments')
         .update(updates)
         .eq('id', paymentId)
-        .select()
+        .select(`
+          *,
+          customers(
+            id,
+            name,
+            email
+          )
+        `)
         .single()
 
       if (error) throw error
 
+      // Transformer les données pour inclure les informations du client
+      const paymentWithCustomer: PaymentWithCustomer = {
+        ...data,
+        customer: data.customers || null
+      }
+
       // Rafraîchir la liste des paiements
       await fetchPayments()
 
-      return data
+      return paymentWithCustomer
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du paiement')
       return null

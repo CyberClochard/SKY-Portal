@@ -157,19 +157,24 @@ const PaymentsPage: React.FC = () => {
       key: 'customer_name', 
       label: 'Client', 
       sortable: true,
-      format: (payment: any) => (
-        <div className="flex items-center">
-          <User className="w-4 h-4 text-gray-400 mr-2" />
-          <div className="text-sm font-medium text-gray-900 dark:text-white">
-            {payment.customer?.name || payment.customer_id}
-          </div>
-          {payment.customer?.email && (
-            <div className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-              ({payment.customer.email})
+      format: (payment: any) => {
+        const customerName = payment.customer?.name || 'Client inconnu'
+        const customerEmail = payment.customer?.email
+        
+        return (
+          <div className="flex items-center">
+            <User className="w-4 h-4 text-gray-400 mr-2" />
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {customerName}
             </div>
-          )}
-        </div>
-      )
+            {customerEmail && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                ({customerEmail})
+              </div>
+            )}
+          </div>
+        )
+      }
     },
     { 
       key: 'amount', 
