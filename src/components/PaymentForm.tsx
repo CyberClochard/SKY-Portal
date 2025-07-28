@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { PaymentFormData, Payment, Customer, PaymentWithCustomer } from '../types/payments'
-import { Euro, User, CreditCard, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react'
+import { Euro, User, CreditCard, CheckCircle, AlertCircle, Loader2, X, Edit } from 'lucide-react'
 
 interface PaymentFormModalProps {
   isOpen: boolean
@@ -333,10 +333,20 @@ const PaymentForm: React.FC<PaymentFormModalProps> = ({ isOpen, onClose, custome
             </div>
 
             {!formData.auto_allocate && (
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  <strong>Note :</strong> L'allocation manuelle sera disponible après la création du paiement.
-                </p>
+              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <div className="flex-shrink-0">
+                    <Edit className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+                      Allocation manuelle
+                    </p>
+                    <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                      Ce paiement sera créé sans allocation automatique. Vous pourrez l'allouer manuellement plus tard depuis la liste des paiements.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </form>

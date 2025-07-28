@@ -19,6 +19,7 @@ const PaymentsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('')
   const [methodFilter, setMethodFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
+  const [allocationFilter, setAllocationFilter] = useState('')
 
   const { payments, loading, error, createPayment, updatePayment, deletePayment } = usePayments()
 
@@ -108,6 +109,8 @@ const PaymentsPage: React.FC = () => {
 
   // Filtrage des paiements
   const filteredPayments = useMemo(() => {
+    if (!payments) return []
+    
     return payments.filter(payment => {
       // Filtre par recherche
       const searchMatch = !searchTerm || 
@@ -121,6 +124,11 @@ const PaymentsPage: React.FC = () => {
 
       // Filtre par mode de paiement
       const methodMatch = !methodFilter || payment.payment_method === methodFilter
+
+      // Filtre par allocation
+      const allocationMatch = !allocationFilter || 
+        (allocationFilter === 'allocated' && payment.auto_allocate) ||
+        (allocationFilter === 'unallocated' && !payment.auto_allocate)
 
       // Filtre par date
       const dateMatch = !dateFilter || (() => {
@@ -147,9 +155,9 @@ const PaymentsPage: React.FC = () => {
         }
       })()
 
-      return searchMatch && statusMatch && methodMatch && dateMatch
+      return searchMatch && statusMatch && methodMatch && allocationMatch && dateMatch
     })
-  }, [payments, searchTerm, statusFilter, methodFilter, dateFilter])
+  }, [payments, searchTerm, statusFilter, methodFilter, allocationFilter, dateFilter])
 
   // Configuration des colonnes triables
   const columns: SortableColumn[] = [
@@ -204,7 +212,16 @@ const PaymentsPage: React.FC = () => {
       key: 'status', 
       label: 'Statut', 
       sortable: true,
-      format: (payment: any) => getStatusBadge(payment.status)
+      format: (payment: any) => (
+        <div className="flex items-center space-x-2">
+          {getStatusBadge(payment.status)}
+          {!payment.auto_allocate && (
+            <span className="px-2 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300 rounded-full text-xs font-medium">
+              Non alloué
+            </span>
+          )}
+        </div>
+      )
     },
     { 
       key: 'created_at', 
@@ -235,7 +252,7 @@ const PaymentsPage: React.FC = () => {
                 setSelectedPayment(payment)
                 setShowAllocationModal(true)
               }}
-              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+              className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300"
               title="Allouer manuellement"
             >
               <Edit className="w-4 h-4" />
@@ -276,6 +293,15 @@ const PaymentsPage: React.FC = () => {
       ],
       value: methodFilter,
       onChange: setMethodFilter
+    },
+    allocation: {
+      label: 'Allocation',
+      options: [
+        { value: 'allocated', label: 'Alloués' },
+        { value: 'unallocated', label: 'Non alloués' }
+      ],
+      value: allocationFilter,
+      onChange: setAllocationFilter
     },
     date: {
       label: 'Période',
@@ -326,6 +352,7 @@ const PaymentsPage: React.FC = () => {
           setSearchTerm('')
           setStatusFilter('')
           setMethodFilter('')
+          setAllocationFilter('')
           setDateFilter('')
         }}
       />
@@ -351,7 +378,7 @@ const PaymentsPage: React.FC = () => {
         ) : filteredPayments.length === 0 ? (
           <div className="p-6 text-center text-gray-600 dark:text-gray-400">
             <Euro className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-            <p>{payments.length === 0 ? 'Aucun paiement trouvé' : 'Aucun paiement ne correspond aux critères de recherche'}</p>
+            <p>{!payments || payments.length === 0 ? 'Aucun paiement trouvé' : 'Aucun paiement ne correspond aux critères de recherche'}</p>
           </div>
         ) : (
           <SortableTable

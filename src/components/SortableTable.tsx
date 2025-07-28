@@ -51,6 +51,7 @@ const SortableTable: React.FC<SortableTableProps> = ({
   }
 
   const sortedData = useMemo(() => {
+    if (!data || !Array.isArray(data)) return []
     if (!sortConfig) return data
 
     return [...data].sort((a, b) => {
@@ -133,10 +134,10 @@ const SortableTable: React.FC<SortableTableProps> = ({
                   }`}
                 >
                   {column.format
-                    ? column.format(row[column.key])
+                    ? column.format(row)
                     : row[column.key] === null || row[column.key] === undefined
                     ? '-'
-                    : row[column.key].toString()}
+                    : String(row[column.key] || '')}
                 </td>
               ))}
             </tr>
