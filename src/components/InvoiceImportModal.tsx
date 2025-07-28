@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react'
-import { X, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
+import { X, Upload, FileText, AlertCircle, CheckCircle, Euro, User, Hash, Calendar } from 'lucide-react'
+import { InvoiceImportResult } from '../lib/supabase'
 
 interface InvoiceImportModalProps {
   isOpen: boolean
   onClose: () => void
-  onImport: (files: File[]) => Promise<{ fileName: string; response: string; status: number }[]>
+  onImport: (files: File[]) => Promise<InvoiceImportResult[]>
 }
 
 const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose, onImport }) => {
@@ -13,7 +14,8 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
-  const [webhookResponses, setWebhookResponses] = useState<{ fileName: string; response: string; status: number }[]>([])
+  const [importResults, setImportResults] = useState<InvoiceImportResult[]>([])
+  const [currentProgress, setCurrentProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 })
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -64,17 +66,29 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
     setIsUploading(true)
     setUploadStatus('idle')
     setErrorMessage('')
-    setWebhookResponses([])
+    setImportResults([])
+    setCurrentProgress({ current: 0, total: selectedFiles.length })
     
     try {
-      const responses = await onImport(selectedFiles)
-      setWebhookResponses(responses)
-      setUploadStatus('success')
+      const results = await onImport(selectedFiles)
+      setImportResults(results)
+      
+      const successCount = results.filter(r => r.success).length
+      const errorCount = results.filter(r => !r.success).length
+      
+      if (errorCount === 0) {
+        setUploadStatus('success')
+      } else if (successCount === 0) {
+        setUploadStatus('error')
+      } else {
+        setUploadStatus('success') // Succès partiel
+      }
     } catch (error) {
       setUploadStatus('error')
       setErrorMessage(error instanceof Error ? error.message : 'Erreur lors de l\'importation')
     } finally {
       setIsUploading(false)
+      setCurrentProgress({ current: 0, total: 0 })
     }
   }
 
@@ -183,7 +197,7 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
               <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
                 <CheckCircle className="w-5 h-5" />
-                <span>Importation réussie !</span>
+                <span>Importation terminée !</span>
               </div>
             </div>
           )}
@@ -197,33 +211,143 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
             </div>
           )}
 
-          {/* Webhook Responses */}
-          {webhookResponses.length > 0 && (
+          {/* Progress Bar */}
+          {isUploading && currentProgress.total > 0 && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>Traitement en cours...</span>
+                <span>{currentProgress.current}/{currentProgress.total}</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(currentProgress.current / currentProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Import Results */}
+          {importResults.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Réponses du webhook n8n
-              </h3>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {webhookResponses.map((response, index) => (
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Rapport d'importation
+                </h3>
+                <div className="flex items-center space-x-4 text-sm">
+                  <span className="text-green-600 dark:text-green-400">
+                    ✅ {importResults.filter(r => r.success).length} succès
+                  </span>
+                  <span className="text-red-600 dark:text-red-400">
+                    ❌ {importResults.filter(r => !r.success).length} échecs
+                  </span>
+                </div>
+              </div>
+              
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {importResults.map((result, index) => (
                   <div
                     key={index}
-                    className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                    className={`p-4 rounded-lg border ${
+                      result.success 
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' 
+                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+                    }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {response.fileName}
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        {result.success ? (
+                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        )}
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {result.fileName}
+                        </span>
+                      </div>
                       <span className={`text-xs px-2 py-1 rounded ${
-                        response.status >= 200 && response.status < 300
+                        result.success
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                           : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                       }`}>
-                        HTTP {response.status}
+                        {result.success ? 'SUCCÈS' : `ERREUR ${result.status}`}
                       </span>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 p-2 rounded border text-xs font-mono text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
-                      {response.response || 'Aucune réponse'}
-                    </div>
+
+                    {result.success && result.extractedData && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Données extraites :
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          {result.extractedData.invoiceNumber && (
+                            <div className="flex items-center space-x-2">
+                              <Hash className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600 dark:text-gray-400">Facture :</span>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {result.extractedData.invoiceNumber}
+                              </span>
+                            </div>
+                          )}
+                          {result.extractedData.ltaNumber && (
+                            <div className="flex items-center space-x-2">
+                              <Hash className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600 dark:text-gray-400">LTA :</span>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {result.extractedData.ltaNumber}
+                              </span>
+                            </div>
+                          )}
+                          {result.extractedData.customer && (
+                            <div className="flex items-center space-x-2">
+                              <User className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600 dark:text-gray-400">Client :</span>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {result.extractedData.customer}
+                              </span>
+                            </div>
+                          )}
+                          {result.extractedData.amount && (
+                            <div className="flex items-center space-x-2">
+                              <Euro className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600 dark:text-gray-400">Montant :</span>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {new Intl.NumberFormat('fr-FR', { 
+                                  style: 'currency', 
+                                  currency: 'EUR' 
+                                }).format(result.extractedData.amount)}
+                              </span>
+                            </div>
+                          )}
+                          {result.extractedData.masterId && (
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600 dark:text-gray-400">Dossier :</span>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {result.extractedData.masterId}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {!result.success && result.error && (
+                      <div className="text-sm text-red-600 dark:text-red-400">
+                        <strong>Erreur :</strong> {result.error}
+                      </div>
+                    )}
+
+                    {result.response && (
+                      <details className="mt-3">
+                        <summary className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200">
+                          Voir la réponse complète
+                        </summary>
+                        <div className="mt-2 bg-white dark:bg-gray-800 p-2 rounded border text-xs font-mono text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
+                          {result.response}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 ))}
               </div>

@@ -329,50 +329,100 @@ export const uploadMultipleInvoicePDFs = async (files: File[]): Promise<string[]
   return Promise.all(uploadPromises)
 }
 
-// Function to send PDF files to n8n webhook
-export const sendPDFsToWebhook = async (files: File[]): Promise<{ fileName: string; response: string; status: number }[]> => {
+// Interface pour les résultats d'import de factures
+export interface InvoiceImportResult {
+  fileName: string
+  success: boolean
+  status: number
+  response?: string
+  error?: string
+  extractedData?: {
+    invoiceNumber?: string
+    ltaNumber?: string
+    customer?: string
+    amount?: number
+    masterId?: string
+  }
+}
+
+// Function to send PDF files to n8n webhook - Traitement individuel
+export const sendPDFsToWebhook = async (files: File[]): Promise<InvoiceImportResult[]> => {
   const webhookUrl = 'https://n8n.skylogistics.fr/webhook/7ec6deef-007b-4821-a3b4-30559bf5425c'
+  const results: InvoiceImportResult[] = []
   
-  try {
-    console.log(`Envoi de ${files.length} fichiers PDF au webhook n8n`)
+  console.log(`Traitement de ${files.length} fichiers PDF au webhook n8n`)
+  
+  // Traiter chaque fichier individuellement
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    console.log(`Traitement du fichier ${i + 1}/${files.length}: ${file.name}`)
     
-    // Envoyer chaque fichier individuellement et capturer les réponses
-    const sendPromises = files.map(async (file) => {
+    try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('fileName', file.name)
       formData.append('fileSize', file.size.toString())
       formData.append('uploadedAt', new Date().toISOString())
       formData.append('totalFiles', files.length.toString())
-      formData.append('fileIndex', (files.indexOf(file) + 1).toString())
+      formData.append('fileIndex', (i + 1).toString())
       
       const response = await fetch(webhookUrl, {
         method: 'POST',
         body: formData
       })
       
+      const responseText = await response.text()
+      
       if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
+        results.push({
+          fileName: file.name,
+          success: false,
+          status: response.status,
+          error: `Erreur HTTP: ${response.status} ${response.statusText}`,
+          response: responseText
+        })
+        console.log(`❌ Échec du traitement de ${file.name}: ${response.status}`)
+        continue
       }
       
-      const result = await response.text()
-      console.log(`Fichier ${file.name} envoyé avec succès au webhook`)
-      console.log(`Réponse du webhook pour ${file.name}:`, result)
+      // Essayer de parser la réponse JSON pour extraire les données
+      let extractedData: any = {}
+      try {
+        const jsonResponse = JSON.parse(responseText)
+        extractedData = {
+          invoiceNumber: jsonResponse.invoice_number || jsonResponse.invoiceNumber,
+          ltaNumber: jsonResponse.lta_number || jsonResponse.ltaNumber,
+          customer: jsonResponse.customer || jsonResponse.customer_name,
+          amount: jsonResponse.amount || jsonResponse.total_amount,
+          masterId: jsonResponse.master_id || jsonResponse.masterId
+        }
+      } catch (parseError) {
+        console.log(`Impossible de parser la réponse JSON pour ${file.name}:`, parseError)
+      }
       
-      return {
+      results.push({
         fileName: file.name,
-        response: result,
-        status: response.status
-      }
-    })
-    
-    const results = await Promise.all(sendPromises)
-    console.log('Tous les fichiers ont été envoyés au webhook avec succès')
-    return results
-  } catch (error) {
-    console.error('Erreur lors de l\'envoi au webhook:', error)
-    throw new Error(`Erreur lors de l'envoi au webhook: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+        success: true,
+        status: response.status,
+        response: responseText,
+        extractedData
+      })
+      
+      console.log(`✅ Succès du traitement de ${file.name}`)
+      
+    } catch (error) {
+      console.error(`❌ Erreur lors du traitement de ${file.name}:`, error)
+      results.push({
+        fileName: file.name,
+        success: false,
+        status: 0,
+        error: error instanceof Error ? error.message : 'Erreur inconnue'
+      })
+    }
   }
+  
+  console.log(`Traitement terminé: ${results.filter(r => r.success).length}/${files.length} succès`)
+  return results
 }
 
 // Alternative: Function to send all PDF files in a single request (if webhook supports it)

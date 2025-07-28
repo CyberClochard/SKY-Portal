@@ -3,6 +3,7 @@ import { supabase, sendPDFsToWebhook } from '../lib/supabase'
 import { RefreshCw, FileText, AlertCircle, Plus } from 'lucide-react'
 import InvoiceImportModal from './InvoiceImportModal'
 import SearchAndFilters from './SearchAndFilters'
+import SortableTable, { SortableColumn } from './SortableTable'
 
 const FacturationPage: React.FC = () => {
   const [invoices, setInvoices] = useState<any[]>([])
@@ -41,21 +42,24 @@ const FacturationPage: React.FC = () => {
     try {
       console.log('Importation de', files.length, 'fichiers PDF')
       
-      // Envoyer les fichiers PDF au webhook n8n et récupérer les réponses
-      const webhookResponses = await sendPDFsToWebhook(files)
-      console.log('Fichiers envoyés au webhook n8n avec succès')
-      console.log('Réponses du webhook:', webhookResponses)
+      // Envoyer les fichiers PDF au webhook n8n et récupérer les résultats
+      const importResults = await sendPDFsToWebhook(files)
+      console.log('Traitement des fichiers PDF terminé')
+      console.log('Résultats d\'import:', importResults)
       
-      // Recharger les factures après importation
-      const { data, error } = await supabase.from('invoice_summary').select('*')
-      if (error) {
-        throw new Error(error.message)
-      } else {
-        setInvoices(data || [])
+      // Recharger les factures après importation (seulement si au moins un succès)
+      const successCount = importResults.filter(r => r.success).length
+      if (successCount > 0) {
+        const { data, error } = await supabase.from('invoice_summary').select('*')
+        if (error) {
+          console.error('Erreur lors du rechargement des factures:', error)
+        } else {
+          setInvoices(data || [])
+        }
       }
       
-      // Retourner les réponses du webhook pour affichage dans le modal
-      return webhookResponses
+      // Retourner les résultats d'import pour affichage dans le modal
+      return importResults
     } catch (error) {
       console.error('Erreur lors de l\'importation:', error)
       throw error
@@ -105,6 +109,80 @@ const FacturationPage: React.FC = () => {
       return searchMatch && statusMatch && customerMatch && dateMatch
     })
   }, [invoices, searchTerm, statusFilter, customerFilter, dateFilter])
+
+  // Configuration des colonnes triables
+  const columns: SortableColumn[] = [
+    { 
+      key: 'created_at', 
+      label: 'Date', 
+      sortable: true,
+      format: (val: any) => {
+        if (!val) return '-';
+        const d = new Date(val)
+        return d.toLocaleDateString('fr-FR')
+      }
+    },
+    { 
+      key: 'customer_name', 
+      label: 'Client', 
+      sortable: true 
+    },
+    { 
+      key: 'master_id', 
+      label: 'Dossier', 
+      sortable: true 
+    },
+    { 
+      key: 'invoice_number', 
+      label: 'Facture n°', 
+      sortable: true 
+    },
+    { 
+      key: 'amount_total', 
+      label: 'Montant', 
+      sortable: true,
+      align: 'text-right',
+      format: (val: any) => {
+        if (val === null || val === undefined) return '-';
+        return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
+      }
+    },
+    { 
+      key: 'amount_paid', 
+      label: 'Payé', 
+      sortable: true,
+      align: 'text-right',
+      format: (val: any) => {
+        if (val === null || val === undefined) return '-';
+        return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
+      }
+    },
+    { 
+      key: 'amount_due', 
+      label: 'Restant dû', 
+      sortable: true,
+      align: 'text-right',
+      format: (val: any) => {
+        if (val === null || val === undefined) return '-';
+        return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
+      }
+    },
+    { 
+      key: 'status', 
+      label: 'Statut', 
+      sortable: true 
+    },
+    { 
+      key: 'due_date', 
+      label: 'Échéance', 
+      sortable: true,
+      format: (val: any) => {
+        if (!val) return '-';
+        const d = new Date(val)
+        return d.toLocaleDateString('fr-FR')
+      }
+    },
+  ]
 
   // Options pour les filtres
   const filterOptions = {
@@ -215,63 +293,11 @@ const FacturationPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            {(() => {
-              // Colonnes à afficher et leur label
-              const columns = [
-                { key: 'created_at', label: 'Date', format: (val: any) => {
-                  if (!val) return '-';
-                  const d = new Date(val)
-                  return d.toLocaleDateString('fr-FR')
-                } },
-                { key: 'customer_name', label: 'Client' },
-                { key: 'master_id', label: 'Dossier' },
-                { key: 'invoice_number', label: 'Facture n°' },
-                { key: 'amount_total', label: 'Montant', format: (val: any) => {
-                  if (val === null || val === undefined) return '-';
-                  return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
-                }, align: 'text-right' },
-                { key: 'amount_paid', label: 'Payé', format: (val: any) => {
-                  if (val === null || val === undefined) return '-';
-                  return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
-                }, align: 'text-right' },
-                { key: 'amount_due', label: 'Restant dû', format: (val: any) => {
-                  if (val === null || val === undefined) return '-';
-                  return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
-                }, align: 'text-right' },
-                { key: 'status', label: 'Statut' },
-                { key: 'due_date', label: 'Échéance', format: (val: any) => {
-                  if (!val) return '-';
-                  const d = new Date(val)
-                  return d.toLocaleDateString('fr-FR')
-                } },
-              ]
-              return (
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      {columns.map((col) => (
-                        <th key={col.key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                          {col.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredInvoices.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        {columns.map((col, i) => (
-                          <td key={i} className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white ${col.align || ''}`}>
-                            {col.format ? col.format(row[col.key]) : (row[col.key] === null || row[col.key] === undefined ? '-' : row[col.key].toString())}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            })()}
-          </div>
+          <SortableTable
+            columns={columns}
+            data={filteredInvoices}
+            defaultSort={{ key: 'created_at', direction: 'desc' }}
+          />
         )}
       </div>
 

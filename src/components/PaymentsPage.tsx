@@ -5,6 +5,7 @@ import PaymentForm from './PaymentForm'
 import ManualAllocationModal from './ManualAllocationModal'
 import PaymentAllocationTable from './PaymentAllocationTable'
 import SearchAndFilters from './SearchAndFilters'
+import SortableTable, { SortableColumn } from './SortableTable'
 import { Plus, Euro, FileText, CreditCard, Calendar, User, Eye, Trash2, Edit } from 'lucide-react'
 
 const PaymentsPage: React.FC = () => {
@@ -150,6 +151,103 @@ const PaymentsPage: React.FC = () => {
     })
   }, [payments, searchTerm, statusFilter, methodFilter, dateFilter])
 
+  // Configuration des colonnes triables
+  const columns: SortableColumn[] = [
+    { 
+      key: 'customer_name', 
+      label: 'Client', 
+      sortable: true,
+      format: (payment: any) => (
+        <div className="flex items-center">
+          <User className="w-4 h-4 text-gray-400 mr-2" />
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {payment.customer?.name || payment.customer_id}
+          </div>
+          {payment.customer?.email && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+              ({payment.customer.email})
+            </div>
+          )}
+        </div>
+      )
+    },
+    { 
+      key: 'amount', 
+      label: 'Montant', 
+      sortable: true,
+      align: 'text-right',
+      format: (payment: any) => (
+        <div className="text-sm font-medium text-gray-900 dark:text-white">
+          {formatCurrency(payment.amount)}
+        </div>
+      )
+    },
+    { 
+      key: 'payment_method', 
+      label: 'Mode', 
+      sortable: true,
+      format: (payment: any) => (
+        <div className="flex items-center">
+          {getPaymentMethodIcon(payment.payment_method)}
+          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+            {getPaymentMethodLabel(payment.payment_method)}
+          </span>
+        </div>
+      )
+    },
+    { 
+      key: 'status', 
+      label: 'Statut', 
+      sortable: true,
+      format: (payment: any) => getStatusBadge(payment.status)
+    },
+    { 
+      key: 'created_at', 
+      label: 'Date', 
+      sortable: true,
+      format: (payment: any) => (
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {formatDate(payment.created_at)}
+        </span>
+      )
+    },
+    { 
+      key: 'actions', 
+      label: 'Actions', 
+      sortable: false,
+      format: (payment: any) => (
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowAllocations(showAllocations === payment.id ? null : payment.id)}
+            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+            title="Voir les allocations"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          {!payment.auto_allocate && (
+            <button
+              onClick={() => {
+                setSelectedPayment(payment)
+                setShowAllocationModal(true)
+              }}
+              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+              title="Allouer manuellement"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => handleDeletePayment(payment.id)}
+            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+            title="Supprimer le paiement"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      )
+    }
+  ]
+
   // Options pour les filtres
   const filterOptions = {
     status: {
@@ -251,100 +349,11 @@ const PaymentsPage: React.FC = () => {
             <p>{payments.length === 0 ? 'Aucun paiement trouvé' : 'Aucun paiement ne correspond aux critères de recherche'}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Montant
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Mode
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredPayments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <User className="w-4 h-4 text-gray-400 mr-2" />
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {payment.customer?.name || payment.customer_id}
-                        </div>
-                        {payment.customer?.email && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                            ({payment.customer.email})
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {formatCurrency(payment.amount)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getPaymentMethodIcon(payment.payment_method)}
-                        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                          {getPaymentMethodLabel(payment.payment_method)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(payment.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(payment.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => setShowAllocations(showAllocations === payment.id ? null : payment.id)}
-                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                          title="Voir les allocations"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {!payment.auto_allocate && (
-                          <button
-                            onClick={() => {
-                              setSelectedPayment(payment)
-                              setShowAllocationModal(true)
-                            }}
-                            className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                            title="Allouer manuellement"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDeletePayment(payment.id)}
-                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                          title="Supprimer le paiement"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SortableTable
+            columns={columns}
+            data={filteredPayments}
+            defaultSort={{ key: 'created_at', direction: 'desc' }}
+          />
         )}
       </div>
 
