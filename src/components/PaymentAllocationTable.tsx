@@ -2,6 +2,7 @@ import React from 'react'
 import { PaymentAllocationDetails, PaymentAllocationTableProps } from '../types/payments'
 import { usePaymentAllocations } from '../hooks/usePaymentAllocations'
 import { FileText, Trash2, Edit, AlertCircle, Loader2 } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
 
 const PaymentAllocationTable: React.FC<PaymentAllocationTableProps> = ({ 
   paymentId, 
@@ -27,9 +28,7 @@ const PaymentAllocationTable: React.FC<PaymentAllocationTableProps> = ({
     }).format(amount)
   }
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('fr-FR')
-  }
+
 
   const getStatusBadge = (amountAllocated: number, invoiceTotal: number) => {
     const percentage = (amountAllocated / invoiceTotal) * 100

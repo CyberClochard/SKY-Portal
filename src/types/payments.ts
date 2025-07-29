@@ -54,22 +54,17 @@ export interface PaymentFormData {
   auto_allocate: boolean
 }
 
-export interface ManualAllocationData {
-  payment_id: string
-  allocations: {
-    invoice_id: string
-    amount_allocated: number
-  }[]
+export interface ManualAllocationItem {
+  invoice_id: string
+  amount_allocated: number
 }
 
 export interface InvoiceSummary {
   id: string
   customer_id: string
-  customer_name: string
   invoice_number: string
   amount_total: number
   amount_paid: number
-  amount_remaining: number
   status: 'unpaid' | 'partial' | 'paid'
   due_date: string
   issued_date: string
@@ -137,4 +132,40 @@ export interface UseUnpaidInvoicesOptions {
 
 export interface UsePaymentAllocationsOptions {
   paymentId: string
+}
+
+export interface DossierSettings {
+  master_id: string
+  manual_mode: boolean
+  updated_by: string
+  updated_at: string
+}
+
+export interface DossierWithMode {
+  master_id: string
+  master_name: string
+  customer_id: string
+  customer_name: string
+  total_invoiced: number
+  total_paid: number
+  balance: number
+  invoice_count: number
+  is_manual_mode: boolean
+  mode_updated_by?: string
+  mode_updated_at?: string
+  dossier_status: 'unpaid' | 'partial' | 'paid'
+}
+
+export interface ManualAllocationItem {
+  invoice_id: string
+  amount_allocated: number
+}
+
+export interface DossierPaymentData {
+  customer_id: string
+  amount: number
+  payment_method: Payment['payment_method']
+  reference?: string
+  notes?: string
+  manual_allocations?: ManualAllocationItem[]
 } 

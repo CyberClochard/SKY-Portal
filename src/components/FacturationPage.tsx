@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { supabase, sendPDFsToWebhook } from '../lib/supabase'
 import { RefreshCw, FileText, AlertCircle, Plus } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
 import InvoiceImportModal from './InvoiceImportModal'
 import SearchAndFilters from './SearchAndFilters'
 import SortableTable, { SortableColumn } from './SortableTable'
@@ -21,13 +22,80 @@ const FacturationPage: React.FC = () => {
     const fetchInvoices = async () => {
       setLoading(true)
       setError(null)
-      const { data, error } = await supabase.from('invoice_summary').select('*')
-      if (error) {
-        setError(error.message)
+      
+      try {
+        // Test d'abord si la vue existe
+        const { data: testData, error: testError } = await supabase
+          .from('invoice_summary')
+          .select('*')
+          .limit(1)
+        
+        if (testError) {
+          console.error('Erreur lors du test de invoice_summary:', testError)
+          setError(`Erreur lors du chargement des factures: ${testError.message}`)
+          setInvoices([])
+          setLoading(false)
+          return
+        }
+        
+        // Si le test passe, récupérer toutes les données
+        const { data, error } = await supabase.from('invoice_summary').select('*')
+        if (error) {
+          setError(error.message)
+          setInvoices([])
+        } else {
+          // Log détaillé des données pour diagnostiquer les problèmes de dates
+          if (data && data.length > 0) {
+            console.log('=== DIAGNOSTIC DES DONNÉES DE INVOICE_SUMMARY ===')
+            console.log('Nombre de factures trouvées:', data.length)
+            console.log('Clés disponibles:', Object.keys(data[0]))
+            data.forEach((invoice, index) => {
+              console.log(`Facture Summary ${index + 1}:`, {
+                id: invoice.id,
+                invoice_number: invoice.invoice_number,
+                customer_name: invoice.customer_name,
+                due_date: {
+                  value: invoice.due_date,
+                  type: typeof invoice.due_date,
+                  isValid: invoice.due_date ? !isNaN(new Date(invoice.due_date).getTime()) : false
+                },
+                issued_date: {
+                  value: invoice.issued_date,
+                  type: typeof invoice.issued_date,
+                  isValid: invoice.issued_date ? !isNaN(new Date(invoice.issued_date).getTime()) : false
+                },
+                created_at: {
+                  value: invoice.created_at,
+                  type: typeof invoice.created_at,
+                  isValid: invoice.created_at ? !isNaN(new Date(invoice.created_at).getTime()) : false
+                },
+                amount_total: {
+                  value: invoice.amount_total,
+                  type: typeof invoice.amount_total
+                },
+                amount_paid: {
+                  value: invoice.amount_paid,
+                  type: typeof invoice.amount_paid
+                },
+                                 amount_due: {
+                   value: invoice.amount_due,
+                   type: typeof invoice.amount_due,
+                   exists: 'amount_due' in invoice
+                 }
+              })
+            })
+            console.log('=== FIN DIAGNOSTIC INVOICE_SUMMARY ===')
+          } else {
+            console.log('Aucune facture trouvée dans invoice_summary')
+          }
+          setInvoices(data || [])
+        }
+      } catch (err) {
+        console.error('Erreur lors du chargement des factures:', err)
+        setError('Erreur lors du chargement des factures')
         setInvoices([])
-      } else {
-        setInvoices(data || [])
       }
+      
       setLoading(false)
     }
     fetchInvoices()
@@ -72,8 +140,7 @@ const FacturationPage: React.FC = () => {
       // Filtre par recherche
       const searchMatch = !searchTerm || 
         invoice.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.master_id?.toLowerCase().includes(searchTerm.toLowerCase())
+        invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase())
 
       // Filtre par statut
       const statusMatch = !statusFilter || invoice.status === statusFilter
@@ -116,20 +183,11 @@ const FacturationPage: React.FC = () => {
       key: 'created_at', 
       label: 'Date', 
       sortable: true,
-      format: (val: any) => {
-        if (!val) return '-';
-        const d = new Date(val)
-        return d.toLocaleDateString('fr-FR')
-      }
+      format: (invoice: any) => formatDate(invoice.created_at)
     },
     { 
       key: 'customer_name', 
       label: 'Client', 
-      sortable: true 
-    },
-    { 
-      key: 'master_id', 
-      label: 'Dossier', 
       sortable: true 
     },
     { 
@@ -142,7 +200,8 @@ const FacturationPage: React.FC = () => {
       label: 'Montant', 
       sortable: true,
       align: 'text-right',
-      format: (val: any) => {
+      format: (invoice: any) => {
+        const val = invoice.amount_total;
         if (val === null || val === undefined) return '-';
         return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
       }
@@ -152,7 +211,8 @@ const FacturationPage: React.FC = () => {
       label: 'Payé', 
       sortable: true,
       align: 'text-right',
-      format: (val: any) => {
+      format: (invoice: any) => {
+        const val = invoice.amount_paid;
         if (val === null || val === undefined) return '-';
         return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
       }
@@ -162,7 +222,9 @@ const FacturationPage: React.FC = () => {
       label: 'Restant dû', 
       sortable: true,
       align: 'text-right',
-      format: (val: any) => {
+      format: (invoice: any) => {
+        const val = invoice.amount_due;
+        console.log('Format amount_due - Valeur reçue:', val, 'Type:', typeof val);
         if (val === null || val === undefined) return '-';
         return Number(val).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
       }
@@ -176,11 +238,7 @@ const FacturationPage: React.FC = () => {
       key: 'due_date', 
       label: 'Échéance', 
       sortable: true,
-      format: (val: any) => {
-        if (!val) return '-';
-        const d = new Date(val)
-        return d.toLocaleDateString('fr-FR')
-      }
+      format: (invoice: any) => formatDate(invoice.due_date)
     },
   ]
 
@@ -293,11 +351,12 @@ const FacturationPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <SortableTable
-            columns={columns}
-            data={filteredInvoices}
-            defaultSort={{ key: 'created_at', direction: 'desc' }}
-          />
+                     <SortableTable
+             columns={columns}
+             data={filteredInvoices}
+             defaultSort={{ key: 'created_at', direction: 'desc' }}
+             itemsPerPage={15}
+           />
         )}
       </div>
 

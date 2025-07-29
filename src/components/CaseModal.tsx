@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { X, Info, Euro, FileText, Calendar, User, MapPin, Package, Truck, Building, Phone, Mail, Clock, AlertCircle, Save, Edit, Plus, Download, Upload, Plane, Ship, Trash2, Calculator, Receipt, CreditCard, Check } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
 import { supabase } from '../lib/supabase'
+import DossierModeToggle from './DossierModeToggle'
+import { useDossierMode } from '../hooks/useDossierMode'
 
 // Types pour les templates
 type DossierType = 'HUM' | 'CARGO'
@@ -181,6 +184,22 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
   const [initialAchatsReels, setInitialAchatsReels] = useState<LigneAchat[]>([])
   const [initialReglements, setInitialReglements] = useState<Reglement[]>([])
 
+  // États pour le mode dossier
+  const [dossierMode, setDossierMode] = useState<boolean>(false)
+  const { getDossierMode, setDossierMode: setDossierModeRPC } = useDossierMode()
+
+  // Fonction pour charger le mode du dossier
+  const loadDossierMode = async () => {
+    if (dossier) {
+      try {
+        const mode = await getDossierMode(`DOSSIER-${dossier}`)
+        setDossierMode(mode)
+      } catch (error) {
+        console.error('Erreur lors du chargement du mode dossier:', error)
+      }
+    }
+  }
+
   // Configuration des onglets
   const tabs = [
     { id: 'general', label: 'Général', icon: Info },
@@ -347,6 +366,9 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
         const mode = caseRecord.MODE || 'AÉRIEN'
         setCargoMode(mode as CargoMode)
       }
+
+      // Charger le mode du dossier pour les paiements
+      await loadDossierMode()
 
     } catch (err) {
       console.error('Failed to load case data:', err)
@@ -1634,6 +1656,25 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
             }
           />
           <CardContent>
+            {/* Toggle Mode Manuel/Automatique */}
+            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <DossierModeToggle
+                masterId={`DOSSIER-${dossier}`}
+                masterName={`Dossier ${dossier}`}
+                currentMode={dossierMode}
+                onModeChange={async (newMode) => {
+                  try {
+                    const result = await setDossierModeRPC(`DOSSIER-${dossier}`, newMode, 'current_user')
+                    if (result.success) {
+                      setDossierMode(newMode)
+                      console.log(`Mode dossier changé: ${newMode ? 'Manuel' : 'Automatique'}`)
+                    }
+                  } catch (error) {
+                    console.error('Erreur lors du changement de mode:', error)
+                  }
+                }}
+              />
+            </div>
             {/* Tableau des règlements */}
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1814,7 +1855,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
                         {doc.fileName} • {formatFileSize(doc.size)}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500">
-                        Uploadé le {new Date(doc.uploadDate).toLocaleDateString('fr-FR')}
+                        Uploadé le {formatDate(doc.uploadDate)}
                       </p>
                     </div>
                   </div>

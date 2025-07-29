@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { User, Mail, Calendar, Shield, LogOut, Edit, Save, X } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
 import { useAuth } from '../contexts/AuthContext'
 
 const UserProfile: React.FC = () => {
@@ -30,13 +31,7 @@ const UserProfile: React.FC = () => {
     setIsEditing(false)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+
 
   const getRoleLabel = (role: string) => {
     switch (role) {

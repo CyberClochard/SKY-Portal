@@ -12,7 +12,14 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
       setLoading(true)
       setError(null)
 
-      // Récupérer les paiements avec les informations du client (LEFT JOIN)
+      // Test de connexion d'abord
+      const connectionTest = await supabase.from('payments').select('*').limit(1)
+      if (connectionTest.error) {
+        console.error('Erreur de connexion à la base de données:', connectionTest.error)
+        throw new Error('Impossible de se connecter à la base de données. Vérifiez que la table "payments" existe.')
+      }
+
+      // Récupérer les paiements avec les informations du client (JOIN)
       let query = supabase
         .from('payments')
         .select(`
@@ -39,7 +46,13 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('Erreur lors de la requête des paiements:', error)
+        if (error.code === '42P01') {
+          throw new Error('La table "payments" n\'existe pas. Veuillez exécuter le script d\'initialisation de la base de données.')
+        }
+        throw error
+      }
 
       // Transformer les données pour inclure les informations du client
       const paymentsWithCustomers = (data || []).map(payment => ({
@@ -53,7 +66,9 @@ export const usePayments = (options: UsePaymentsOptions = {}) => {
 
       setPayments(paymentsWithCustomers)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des paiements')
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des paiements'
+      console.error('Erreur dans usePayments:', errorMessage)
+      setError(errorMessage)
       setPayments([])
     } finally {
       setLoading(false)

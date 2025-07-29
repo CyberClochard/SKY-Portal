@@ -3,6 +3,7 @@ import { Payment, InvoiceSummary, ManualAllocationModalProps } from '../types/pa
 import { useUnpaidInvoices } from '../hooks/useUnpaidInvoices'
 import { usePaymentAllocations } from '../hooks/usePaymentAllocations'
 import { X, Euro, FileText, CheckCircle, AlertCircle, Loader2, Calculator } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
 
 const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({ 
   isOpen, 
@@ -75,7 +76,10 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
       
       if (success) {
         setSuccess('Allocation automatique du montant restant effectuée')
-        if (onSuccess) onSuccess()
+        // Attendre un peu pour que la base de données se mette à jour
+        setTimeout(() => {
+          if (onSuccess) onSuccess()
+        }, 500)
       } else {
         setError('Erreur lors de l\'allocation automatique')
       }
@@ -113,7 +117,10 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
 
       if (success) {
         setSuccess('Allocation manuelle effectuée avec succès')
-        if (onSuccess) onSuccess()
+        // Attendre un peu pour que la base de données se mette à jour
+        setTimeout(() => {
+          if (onSuccess) onSuccess()
+        }, 500)
       } else {
         setError('Erreur lors de l\'allocation manuelle')
       }
@@ -125,15 +132,17 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
   }
 
   const formatCurrency = (amount: number): string => {
+    // Vérifier si le montant est valide
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return '0,00 €'
+    }
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'EUR'
     }).format(amount)
   }
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('fr-FR')
-  }
+
 
   if (!isOpen || !payment) return null
 
@@ -226,7 +235,18 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                 Factures impayées
               </h3>
               
-              {invoices.map((invoice) => (
+              {invoices
+                .sort((a, b) => {
+                  // Tri par date d'échéance (plus ancienne en premier)
+                  const dateA = new Date(a.due_date || 0)
+                  const dateB = new Date(b.due_date || 0)
+                  if (dateA.getTime() !== dateB.getTime()) {
+                    return dateA.getTime() - dateB.getTime()
+                  }
+                  // Si même date d'échéance, tri par numéro de facture
+                  return (a.invoice_number || '').localeCompare(b.invoice_number || '')
+                })
+                .map((invoice) => (
                 <div key={invoice.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -240,7 +260,7 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                     <div className="text-right">
                       <p className="text-sm text-gray-600 dark:text-gray-400">Montant restant</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {formatCurrency(invoice.amount_remaining)}
+                        {formatCurrency(invoice.amount_remaining || (invoice.amount_total - invoice.amount_paid))}
                       </p>
                     </div>
                   </div>
@@ -255,7 +275,7 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          max={invoice.amount_remaining}
+                          max={invoice.amount_remaining || (invoice.amount_total - invoice.amount_paid)}
                           value={allocations[invoice.id] || 0}
                           onChange={(e) => handleAllocationChange(invoice.id, parseFloat(e.target.value) || 0)}
                           className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
@@ -267,7 +287,7 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                     </div>
                     
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <p>Max: {formatCurrency(invoice.amount_remaining)}</p>
+                      <p>Max: {formatCurrency(invoice.amount_remaining || (invoice.amount_total - invoice.amount_paid))}</p>
                     </div>
                   </div>
                 </div>

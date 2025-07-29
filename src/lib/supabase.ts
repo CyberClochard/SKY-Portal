@@ -43,6 +43,118 @@ export const testConnection = async () => {
   }
 }
 
+// Test connection function for payments system
+export const testPaymentsConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('customers').select('*').limit(1)
+    if (error) throw error
+    return { success: true, message: 'Connexion OK', data }
+  } catch (error) {
+    return { success: false, message: 'Erreur de connexion', error }
+  }
+}
+
+// Fonction de diagnostic avancée pour les types de données
+export const testDataTypes = async () => {
+  try {
+    console.log('=== TEST DES TYPES DE DONNÉES ===')
+    
+    // Test des factures
+    const { data: invoices, error: invoicesError } = await supabase
+      .from('invoices')
+      .select('*')
+      .limit(1)
+    
+    if (invoicesError) {
+      console.error('Erreur lors du test des factures:', invoicesError)
+      return { success: false, error: invoicesError }
+    }
+    
+    if (invoices && invoices.length > 0) {
+      const invoice = invoices[0]
+      console.log('Types des champs de facture:')
+      console.log('- due_date:', typeof invoice.due_date, 'Valeur:', invoice.due_date)
+      console.log('- issued_date:', typeof invoice.issued_date, 'Valeur:', invoice.issued_date)
+      console.log('- created_at:', typeof invoice.created_at, 'Valeur:', invoice.created_at)
+      console.log('- amount_total:', typeof invoice.amount_total, 'Valeur:', invoice.amount_total)
+    }
+    
+    // Test de la vue invoice_summary
+    const { data: summary, error: summaryError } = await supabase
+      .from('invoice_summary')
+      .select('*')
+      .limit(1)
+    
+    if (summaryError) {
+      console.error('Erreur lors du test de invoice_summary:', summaryError)
+      return { success: false, error: summaryError }
+    }
+    
+    if (summary && summary.length > 0) {
+      const invoiceSummary = summary[0]
+      console.log('Types des champs de invoice_summary:')
+      console.log('- due_date:', typeof invoiceSummary.due_date, 'Valeur:', invoiceSummary.due_date)
+      console.log('- issued_date:', typeof invoiceSummary.issued_date, 'Valeur:', invoiceSummary.issued_date)
+      console.log('- created_at:', typeof invoiceSummary.created_at, 'Valeur:', invoiceSummary.created_at)
+      console.log('- amount_total:', typeof invoiceSummary.amount_total, 'Valeur:', invoiceSummary.amount_total)
+      console.log('- amount_remaining:', typeof invoiceSummary.amount_remaining, 'Valeur:', invoiceSummary.amount_remaining)
+    }
+    
+    console.log('=== FIN TEST DES TYPES ===')
+    return { success: true }
+  } catch (error) {
+    console.error('Erreur lors du test des types:', error)
+    return { success: false, error }
+  }
+}
+
+// Fonction spécifique pour tester la vue invoice_summary
+export const testInvoiceSummary = async () => {
+  try {
+    console.log('=== TEST SPÉCIFIQUE INVOICE_SUMMARY ===')
+    
+    // Test 1: Vérifier si la vue existe
+    const { data: testData, error: testError } = await supabase
+      .from('invoice_summary')
+      .select('*')
+      .limit(1)
+    
+    if (testError) {
+      console.error('❌ Vue invoice_summary non trouvée:', testError)
+      return { success: false, error: testError }
+    }
+    
+    console.log('✅ Vue invoice_summary existe')
+    
+    // Test 2: Récupérer toutes les données
+    const { data, error } = await supabase
+      .from('invoice_summary')
+      .select('*')
+    
+    if (error) {
+      console.error('❌ Erreur lors de la récupération des données:', error)
+      return { success: false, error }
+    }
+    
+    console.log(`✅ ${data?.length || 0} factures trouvées`)
+    
+    if (data && data.length > 0) {
+      const firstInvoice = data[0]
+      console.log('📋 Structure de la première facture:')
+      console.log('- Clés disponibles:', Object.keys(firstInvoice))
+      console.log('- due_date:', firstInvoice.due_date, '(type:', typeof firstInvoice.due_date, ')')
+      console.log('- amount_total:', firstInvoice.amount_total, '(type:', typeof firstInvoice.amount_total, ')')
+      console.log('- amount_remaining:', firstInvoice.amount_remaining, '(type:', typeof firstInvoice.amount_remaining, ')')
+    }
+    
+    console.log('=== FIN TEST INVOICE_SUMMARY ===')
+    return { success: true, data }
+  } catch (error) {
+    console.error('❌ Erreur lors du test invoice_summary:', error)
+    return { success: false, error }
+  }
+}
+
 // Interface for AirlinesDirectory table
 export interface AirlineDirectory {
   id?: string
@@ -426,7 +538,7 @@ export const sendPDFsToWebhook = async (files: File[]): Promise<InvoiceImportRes
 }
 
 // Alternative: Function to send all PDF files in a single request (if webhook supports it)
-export const sendPDFsToWebhookBatch = async (files: File[]): Promise<void> => {
+export const sendPDFsToWebhookBatch = async (files: File[]): Promise<string> => {
   const webhookUrl = 'https://n8n.skylogistics.fr/webhook/7ec6deef-007b-4821-a3b4-30559bf5425c'
   
   try {
@@ -458,5 +570,58 @@ export const sendPDFsToWebhookBatch = async (files: File[]): Promise<void> => {
   } catch (error) {
     console.error('Erreur lors de l\'envoi au webhook en lot:', error)
     throw new Error(`Erreur lors de l'envoi au webhook: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+  }
+}
+
+export const fixExistingPaymentAllocationStatus = async (): Promise<{ success: boolean; message: string }> => {
+  try {
+    console.log('Début de la correction des statuts d\'allocation...')
+
+    // 1. Récupérer tous les paiements qui ont des allocations mais auto_allocate = false
+    const { data: paymentsWithAllocations, error: queryError } = await supabase
+      .from('payments')
+      .select(`
+        id,
+        auto_allocate,
+        payment_allocations!inner(id)
+      `)
+      .eq('auto_allocate', false)
+
+    if (queryError) {
+      console.error('Erreur lors de la requête des paiements avec allocations:', queryError)
+      return { success: false, message: `Erreur de requête: ${queryError.message}` }
+    }
+
+    if (!paymentsWithAllocations || paymentsWithAllocations.length === 0) {
+      console.log('Aucun paiement à corriger trouvé')
+      return { success: true, message: 'Aucun paiement à corriger trouvé' }
+    }
+
+    console.log(`${paymentsWithAllocations.length} paiements à corriger trouvés`)
+
+    // 2. Mettre à jour le statut auto_allocate pour ces paiements
+    const paymentIds = paymentsWithAllocations.map(p => p.id)
+    const { error: updateError } = await supabase
+      .from('payments')
+      .update({ auto_allocate: true })
+      .in('id', paymentIds)
+
+    if (updateError) {
+      console.error('Erreur lors de la mise à jour des paiements:', updateError)
+      return { success: false, message: `Erreur de mise à jour: ${updateError.message}` }
+    }
+
+    console.log(`${paymentIds.length} paiements corrigés avec succès`)
+    return { 
+      success: true, 
+      message: `${paymentIds.length} paiements corrigés avec succès` 
+    }
+
+  } catch (error) {
+    console.error('Erreur lors de la correction des statuts:', error)
+    return { 
+      success: false, 
+      message: `Erreur inattendue: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
+    }
   }
 }
