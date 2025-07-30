@@ -15,7 +15,7 @@ import Settings from './components/Settings'
 import UserProfile from './components/UserProfile'
 import FacturationPage from './components/FacturationPage'
 import PaymentsPage from './components/PaymentsPage'
-import CashSettlementsPage from './components/CashSettlementsPage'
+
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -44,8 +44,7 @@ function App() {
         return <FacturationPage />
       case 'payments':
         return <PaymentsPage />
-      case 'cash-settlements':
-        return <CashSettlementsPage />
+
       case 'settings':
         return <Settings />
       case 'profile':

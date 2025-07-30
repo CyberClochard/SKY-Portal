@@ -143,44 +143,6 @@ export interface DossierPaymentData {
   manual_allocations?: ManualAllocationItem[]
 }
 
-// Types pour règlements espèces hors comptabilité
-export interface CashSettlement {
-  id: string
-  master_id: string
-  customer_id: string
-  amount: number
-  settlement_date: string
-  notes?: string
-  created_by: string
-  created_at: string
-}
 
-export interface CashSettlementDetail extends CashSettlement {
-  customer_name?: string
-  customer_email?: string
-}
-
-export interface DossierStatusWithCash {
-  master_id: string
-  dossier_number?: string
-  master_name?: string
-  customer_id: string
-  customer_name: string
-  total_invoiced: number
-  total_paid: number
-  total_cash_settlements: number
-  last_cash_settlement_date?: string
-  dossier_status: 'cash_settled' | 'invoiced_paid' | 'invoiced_partial' | 'invoiced_unpaid' | 'no_activity'
-  has_cash_settlements: boolean
-  has_invoices: boolean
-}
-
-export interface CashSettlementFormData {
-  master_id: string
-  customer_id: string
-  amount: number
-  notes?: string
-  created_by?: string
-}
 
  

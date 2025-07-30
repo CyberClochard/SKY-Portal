@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Database, Settings, Home, ChevronLeft, Menu, Plane, Upload, X, CheckSquare, FileText, User, LogOut, Plus, Euro, DollarSign } from 'lucide-react'
+import { Database, Settings, Home, ChevronLeft, Menu, Plane, Upload, X, CheckSquare, FileText, User, LogOut, Plus, Euro } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -55,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
     { id: 'booking-confirmation', icon: FileText, label: 'Confirmation Réservation' },
     { id: 'facturation', icon: Euro, label: 'Facturation' },
     { id: 'payments', icon: Euro, label: 'Règlements' },
-    { id: 'cash-settlements', icon: DollarSign, label: 'Règlements Espèces' },
+
     { id: 'settings', icon: Settings, label: 'Paramètres' },
   ]
 
