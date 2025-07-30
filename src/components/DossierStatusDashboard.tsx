@@ -122,10 +122,12 @@ export const DossierStatusDashboard: React.FC<DossierStatusDashboardProps> = ({ 
                 className={`hover:bg-gray-50 ${onDossierClick ? 'cursor-pointer' : ''}`}
                 onClick={() => onDossierClick?.(dossier.master_id)}
               >
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{dossier.master_name}</div>
-                  <div className="text-sm text-gray-500">{dossier.customer_name}</div>
-                </td>
+                                 <td className="px-6 py-4 whitespace-nowrap">
+                   <div className="font-medium text-gray-900">
+                     {dossier.dossier_number || dossier.master_id}
+                   </div>
+                   <div className="text-sm text-gray-500">{dossier.customer_name}</div>
+                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {getStatusBadge(dossier.dossier_status, dossier.has_cash_settlements, dossier.has_invoices)}
                 </td>

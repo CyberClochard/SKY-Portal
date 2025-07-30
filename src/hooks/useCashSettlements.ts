@@ -100,9 +100,9 @@ export const useDossierStatusWithCash = (customerId?: string) => {
     setLoading(true)
     
     const query = supabase
-      .from('dossier_status_with_cash')
+      .from('dossier_status_with_cash_uninvoiced')
       .select('*')
-      .order('master_name')
+      .order('dossier_number')
     
     if (customerId) {
       query.eq('customer_id', customerId)

@@ -162,7 +162,8 @@ export interface CashSettlementDetail extends CashSettlement {
 
 export interface DossierStatusWithCash {
   master_id: string
-  master_name: string
+  dossier_number?: string
+  master_name?: string
   customer_id: string
   customer_name: string
   total_invoiced: number

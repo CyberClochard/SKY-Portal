@@ -61,7 +61,7 @@ export const DossierPage: React.FC<DossierPageProps> = ({ masterId }) => {
   
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dossier {dossierData.master_name}</h1>
+             <h1 className="text-2xl font-bold">Dossier {dossierData.dossier_number || dossierData.master_id}</h1>
       
       {/* Statut du dossier */}
       <div className="bg-white p-4 rounded-lg shadow">
@@ -101,12 +101,12 @@ export const DossierPage: React.FC<DossierPageProps> = ({ masterId }) => {
       {/* Formulaire règlement espèces */}
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium mb-4">Enregistrer un règlement espèces</h3>
-        <CashSettlementForm
-          masterId={masterId}
-          masterName={dossierData.master_name}
-          customerId={dossierData.customer_id}
-          onSuccess={handleSuccess}
-        />
+                 <CashSettlementForm
+           masterId={masterId}
+           masterName={dossierData.dossier_number || dossierData.master_id}
+           customerId={dossierData.customer_id}
+           onSuccess={handleSuccess}
+         />
       </div>
       
       {/* Historique des règlements espèces */}
