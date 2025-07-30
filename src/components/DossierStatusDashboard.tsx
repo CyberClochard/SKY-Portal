@@ -17,22 +17,10 @@ export const DossierStatusDashboard: React.FC<DossierStatusDashboardProps> = ({ 
             💵 Réglé espèces
           </span>
         )
-      case 'invoiced_paid':
+      case 'no_activity':
         return (
-          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-            ✅ Facturé & payé
-          </span>
-        )
-      case 'invoiced_partial':
-        return (
-          <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-            ⏳ Partiellement payé
-          </span>
-        )
-      case 'invoiced_unpaid':
-        return (
-          <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-            ❌ Facturé impayé
+          <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+            📝 Disponible pour règlement espèces
           </span>
         )
       default:
@@ -49,17 +37,11 @@ export const DossierStatusDashboard: React.FC<DossierStatusDashboardProps> = ({ 
       return `${dossier.total_cash_settlements.toFixed(2)}€ espèces`
     }
     
-    let summary = `${dossier.total_invoiced.toFixed(2)}€ facturé`
-    
-    if (dossier.total_paid > 0) {
-      summary += ` • ${dossier.total_paid.toFixed(2)}€ payé`
+    if (dossier.dossier_status === 'no_activity') {
+      return 'Aucun règlement espèces'
     }
     
-    if (dossier.has_cash_settlements) {
-      summary += ` • ${dossier.total_cash_settlements.toFixed(2)}€ espèces`
-    }
-    
-    return summary
+    return 'Aucune activité'
   }
   
   if (loading) return <div>Chargement...</div>
@@ -68,33 +50,21 @@ export const DossierStatusDashboard: React.FC<DossierStatusDashboardProps> = ({ 
     <div className="space-y-6">
       <h2 className="text-xl font-semibold">Statut des dossiers</h2>
       
-      {/* Métriques */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-orange-50 p-4 rounded-lg">
-          <div className="text-sm text-orange-600">Réglés espèces</div>
-          <div className="text-2xl font-bold text-orange-900">
-            {dossiers.filter(d => d.dossier_status === 'cash_settled').length}
-          </div>
-        </div>
-        <div className="bg-green-50 p-4 rounded-lg">
-          <div className="text-sm text-green-600">Facturés & payés</div>
-          <div className="text-2xl font-bold text-green-900">
-            {dossiers.filter(d => d.dossier_status === 'invoiced_paid').length}
-          </div>
-        </div>
-        <div className="bg-yellow-50 p-4 rounded-lg">
-          <div className="text-sm text-yellow-600">Partiels</div>
-          <div className="text-2xl font-bold text-yellow-900">
-            {dossiers.filter(d => d.dossier_status === 'invoiced_partial').length}
-          </div>
-        </div>
-        <div className="bg-red-50 p-4 rounded-lg">
-          <div className="text-sm text-red-600">Impayés</div>
-          <div className="text-2xl font-bold text-red-900">
-            {dossiers.filter(d => d.dossier_status === 'invoiced_unpaid').length}
-          </div>
-        </div>
-      </div>
+             {/* Métriques */}
+       <div className="grid grid-cols-2 gap-4">
+         <div className="bg-orange-50 p-4 rounded-lg">
+           <div className="text-sm text-orange-600">Réglés espèces</div>
+           <div className="text-2xl font-bold text-orange-900">
+             {dossiers.filter(d => d.dossier_status === 'cash_settled').length}
+           </div>
+         </div>
+         <div className="bg-blue-50 p-4 rounded-lg">
+           <div className="text-sm text-blue-600">Disponibles pour règlement</div>
+           <div className="text-2xl font-bold text-blue-900">
+             {dossiers.filter(d => d.dossier_status === 'no_activity').length}
+           </div>
+         </div>
+       </div>
       
       {/* Liste des dossiers */}
       <div className="bg-white shadow overflow-hidden rounded-md">

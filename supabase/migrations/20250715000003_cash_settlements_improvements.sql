@@ -2,25 +2,29 @@
 -- - Afficher le numéro de dossier (DOSSIER) au lieu de l'ID
 -- - Filtrer pour ne montrer que les dossiers non facturés
 
--- 1. VUE AMÉLIORÉE POUR RÈGLEMENTS ESPÈCES (DOSSIERS NON FACTURÉS UNIQUEMENT)
+-- 1. VUE AMÉLIORÉE POUR RÈGLEMENTS ESPÈCES (TOUS LES DOSSIERS NON FACTURÉS)
 CREATE OR REPLACE VIEW dossier_status_with_cash_uninvoiced AS
 SELECT 
-  COALESCE(cash_data.master_id, m.DOSSIER) as master_id,
-  COALESCE(m.DOSSIER, cash_data.master_id) as dossier_number,
-  COALESCE(m.CLIENT, cash_data.customer_name) as customer_name,
-  cash_data.customer_id,
+  m.DOSSIER as master_id,
+  m.DOSSIER as dossier_number,
+  m.CLIENT as customer_name,
+  NULL as customer_id, -- Pas de customer_id pour les dossiers sans règlements
   
   -- Règlements espèces (hors comptabilité)
   COALESCE(cash_data.total_cash_settlements, 0) as total_cash_settlements,
   cash_data.last_cash_settlement_date,
   
-  -- Statut (toujours cash_settled car seuls les non facturés sont inclus)
-  'cash_settled' as dossier_status,
+  -- Statut basé sur les règlements espèces
+  CASE 
+    WHEN COALESCE(cash_data.total_cash_settlements, 0) > 0 THEN 'cash_settled'
+    ELSE 'no_activity'
+  END as dossier_status,
   
   COALESCE(cash_data.total_cash_settlements, 0) > 0 as has_cash_settlements,
   false as has_invoices -- Toujours false car seuls les non facturés
   
-FROM (
+FROM MASTER m
+LEFT JOIN (
   -- Données des règlements espèces
   SELECT 
     cs.master_id,
@@ -31,13 +35,12 @@ FROM (
   FROM cash_settlements cs
   LEFT JOIN customers c ON cs.customer_id = c.id
   GROUP BY cs.master_id, cs.customer_id, c.name
-) cash_data
-LEFT JOIN MASTER m ON cash_data.master_id = m.DOSSIER
+) cash_data ON m.DOSSIER = cash_data.master_id
 WHERE NOT EXISTS (
   -- Exclure les dossiers qui ont des factures
-  SELECT 1 FROM invoices i WHERE i.master_id = cash_data.master_id
+  SELECT 1 FROM invoices i WHERE i.master_id = m.DOSSIER
 )
-ORDER BY COALESCE(m.DOSSIER, cash_data.master_id);
+ORDER BY m.DOSSIER;
 
 -- 2. VUE POUR TOUS LES DOSSIERS AVEC RÈGLEMENTS ESPÈCES (COMPLÈTE)
 CREATE OR REPLACE VIEW dossier_status_with_cash_complete AS

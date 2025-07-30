@@ -75,27 +75,20 @@ export const DossierPage: React.FC<DossierPageProps> = ({ masterId }) => {
           </div>
         </div>
         
-        {/* Résumé financier */}
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          {dossierData.has_invoices && (
-            <>
-              <div>
-                <div className="text-sm text-gray-600">Facturé</div>
-                <div className="text-lg font-bold">{dossierData.total_invoiced.toFixed(2)}€</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Payé (factures)</div>
-                <div className="text-lg font-bold text-green-600">{dossierData.total_paid.toFixed(2)}€</div>
-              </div>
-            </>
-          )}
-          {dossierData.has_cash_settlements && (
-            <div>
-              <div className="text-sm text-gray-600">Espèces (hors compta)</div>
-              <div className="text-lg font-bold text-orange-600">{dossierData.total_cash_settlements.toFixed(2)}€</div>
-            </div>
-          )}
-        </div>
+                 {/* Résumé financier */}
+         <div className="mt-4 grid grid-cols-1 gap-4">
+           {dossierData.has_cash_settlements ? (
+             <div>
+               <div className="text-sm text-gray-600">Espèces (hors compta)</div>
+               <div className="text-lg font-bold text-orange-600">{dossierData.total_cash_settlements.toFixed(2)}€</div>
+             </div>
+           ) : (
+             <div>
+               <div className="text-sm text-gray-600">Aucun règlement espèces</div>
+               <div className="text-lg font-bold text-gray-500">0.00€</div>
+             </div>
+           )}
+         </div>
       </div>
       
       {/* Formulaire règlement espèces */}
@@ -104,7 +97,7 @@ export const DossierPage: React.FC<DossierPageProps> = ({ masterId }) => {
                  <CashSettlementForm
            masterId={masterId}
            masterName={dossierData.dossier_number || dossierData.master_id}
-           customerId={dossierData.customer_id}
+           customerId={dossierData.customer_id || ''}
            onSuccess={handleSuccess}
          />
       </div>
