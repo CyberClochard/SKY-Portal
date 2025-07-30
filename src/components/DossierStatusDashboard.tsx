@@ -2,7 +2,11 @@ import React from 'react'
 import { useDossierStatusWithCash } from '../hooks/useCashSettlements'
 import { DossierStatusWithCash } from '../types/payments'
 
-export const DossierStatusDashboard: React.FC = () => {
+interface DossierStatusDashboardProps {
+  onDossierClick?: (masterId: string) => void
+}
+
+export const DossierStatusDashboard: React.FC<DossierStatusDashboardProps> = ({ onDossierClick }) => {
   const { dossiers, loading } = useDossierStatusWithCash()
   
   const getStatusBadge = (status: string, hasCash: boolean, hasInvoices: boolean) => {
@@ -113,7 +117,11 @@ export const DossierStatusDashboard: React.FC = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {dossiers.map((dossier) => (
-              <tr key={dossier.master_id} className="hover:bg-gray-50">
+              <tr 
+                key={dossier.master_id} 
+                className={`hover:bg-gray-50 ${onDossierClick ? 'cursor-pointer' : ''}`}
+                onClick={() => onDossierClick?.(dossier.master_id)}
+              >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="font-medium text-gray-900">{dossier.master_name}</div>
                   <div className="text-sm text-gray-500">{dossier.customer_name}</div>
