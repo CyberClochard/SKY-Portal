@@ -73,8 +73,10 @@ const DataTable: React.FC = () => {
       console.log('MASTER data loaded:', masterData?.length || 0, 'records')
       
       if (masterData && masterData.length > 0) {
-        // Get column names from the first record
-        const columns = Object.keys(masterData[0]).filter(key => key !== 'id')
+        // Get column names from the first record, excluding 'id' and 'FACTURE_MANUAL_OVERRIDE'
+        const columns = Object.keys(masterData[0]).filter(key => 
+          key !== 'id' && key !== 'FACTURE_MANUAL_OVERRIDE'
+        )
         setTableColumns(columns)
         
         // Set all columns as visible by default
