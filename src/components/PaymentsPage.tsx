@@ -7,7 +7,7 @@ import PaymentAllocationTable from './PaymentAllocationTable'
 import SearchAndFilters from './SearchAndFilters'
 import SortableTable, { SortableColumn } from './SortableTable'
 import DatabaseDiagnostic from './DatabaseDiagnostic'
-import { Plus, Euro, FileText, CreditCard, Calendar, User, Eye, Trash2, Edit } from 'lucide-react'
+import { Plus, Euro, FileText, CreditCard, Calendar, User, Eye, Trash2, Edit, RefreshCw } from 'lucide-react'
 import { formatDate } from '../utils/dateUtils'
 
 const PaymentsPage: React.FC = () => {
@@ -338,13 +338,24 @@ const PaymentsPage: React.FC = () => {
             Gérer les paiements clients et leurs allocations
           </p>
         </div>
-        <button
-          onClick={() => setShowPaymentForm(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nouveau paiement</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={refetch}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            title="Rafraîchir les données"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Actualiser</span>
+          </button>
+          <button
+            onClick={() => setShowPaymentForm(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nouveau paiement</span>
+          </button>
+        </div>
       </div>
 
              {/* Diagnostic de la base de données */}

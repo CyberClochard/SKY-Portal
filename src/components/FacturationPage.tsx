@@ -18,86 +18,95 @@ const FacturationPage: React.FC = () => {
   const [customerFilter, setCustomerFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      setLoading(true)
-      setError(null)
+  const fetchInvoices = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      // Test d'abord si la vue existe
+      const { data: testData, error: testError } = await supabase
+        .from('invoice_summary')
+        .select('*')
+        .limit(1)
       
-      try {
-        // Test d'abord si la vue existe
-        const { data: testData, error: testError } = await supabase
-          .from('invoice_summary')
-          .select('*')
-          .limit(1)
-        
-        if (testError) {
-          console.error('Erreur lors du test de invoice_summary:', testError)
-          setError(`Erreur lors du chargement des factures: ${testError.message}`)
-          setInvoices([])
-          setLoading(false)
-          return
-        }
-        
-        // Si le test passe, récupérer toutes les données
-        const { data, error } = await supabase.from('invoice_summary').select('*')
-        if (error) {
-          setError(error.message)
-          setInvoices([])
-        } else {
-          // Log détaillé des données pour diagnostiquer les problèmes de dates
-          if (data && data.length > 0) {
-            console.log('=== DIAGNOSTIC DES DONNÉES DE INVOICE_SUMMARY ===')
-            console.log('Nombre de factures trouvées:', data.length)
-            console.log('Clés disponibles:', Object.keys(data[0]))
-            data.forEach((invoice, index) => {
-              console.log(`Facture Summary ${index + 1}:`, {
-                id: invoice.id,
-                invoice_number: invoice.invoice_number,
-                customer_name: invoice.customer_name,
-                due_date: {
-                  value: invoice.due_date,
-                  type: typeof invoice.due_date,
-                  isValid: invoice.due_date ? !isNaN(new Date(invoice.due_date).getTime()) : false
-                },
-                issued_date: {
-                  value: invoice.issued_date,
-                  type: typeof invoice.issued_date,
-                  isValid: invoice.issued_date ? !isNaN(new Date(invoice.issued_date).getTime()) : false
-                },
-                created_at: {
-                  value: invoice.created_at,
-                  type: typeof invoice.created_at,
-                  isValid: invoice.created_at ? !isNaN(new Date(invoice.created_at).getTime()) : false
-                },
-                amount_total: {
-                  value: invoice.amount_total,
-                  type: typeof invoice.amount_total
-                },
-                amount_paid: {
-                  value: invoice.amount_paid,
-                  type: typeof invoice.amount_paid
-                },
-                                 amount_due: {
-                   value: invoice.amount_due,
-                   type: typeof invoice.amount_due,
-                   exists: 'amount_due' in invoice
-                 }
-              })
-            })
-            console.log('=== FIN DIAGNOSTIC INVOICE_SUMMARY ===')
-          } else {
-            console.log('Aucune facture trouvée dans invoice_summary')
-          }
-          setInvoices(data || [])
-        }
-      } catch (err) {
-        console.error('Erreur lors du chargement des factures:', err)
-        setError('Erreur lors du chargement des factures')
+      if (testError) {
+        console.error('Erreur lors du test de invoice_summary:', testError)
+        setError(`Erreur lors du chargement des factures: ${testError.message}`)
         setInvoices([])
+        setLoading(false)
+        return
       }
       
-      setLoading(false)
+      // Si le test passe, récupérer toutes les données
+      const { data, error } = await supabase.from('invoice_summary').select('*')
+      if (error) {
+        setError(error.message)
+        setInvoices([])
+      } else {
+        // Log détaillé des données pour diagnostiquer les problèmes de dates
+        if (data && data.length > 0) {
+          console.log('=== DIAGNOSTIC DES DONNÉES DE INVOICE_SUMMARY ===')
+          console.log('Nombre de factures trouvées:', data.length)
+          console.log('Clés disponibles:', Object.keys(data[0]))
+          data.forEach((invoice, index) => {
+            console.log(`Facture Summary ${index + 1}:`, {
+              id: invoice.id,
+              invoice_number: invoice.invoice_number,
+              customer_name: invoice.customer_name,
+              due_date: {
+                value: invoice.due_date,
+                type: typeof invoice.due_date,
+                isValid: invoice.due_date ? !isNaN(new Date(invoice.due_date).getTime()) : false
+              },
+              issued_date: {
+                value: invoice.issued_date,
+                type: typeof invoice.issued_date,
+                isValid: invoice.issued_date ? !isNaN(new Date(invoice.issued_date).getTime()) : false
+              },
+              created_at: {
+                value: invoice.created_at,
+                type: typeof invoice.created_at,
+                isValid: invoice.created_at ? !isNaN(new Date(invoice.created_at).getTime()) : false
+              },
+              amount_total: {
+                value: invoice.amount_total,
+                type: typeof invoice.amount_total
+              },
+              amount_paid: {
+                value: invoice.amount_paid,
+                type: typeof invoice.amount_paid
+              },
+                               amount_due: {
+                 value: invoice.amount_due,
+                 type: typeof invoice.amount_due,
+                 exists: 'amount_due' in invoice
+               }
+            })
+          })
+          console.log('=== FIN DIAGNOSTIC INVOICE_SUMMARY ===')
+        } else {
+          console.log('Aucune facture trouvée dans invoice_summary')
+        }
+        setInvoices(data || [])
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des factures:', err)
+      setError('Erreur lors du chargement des factures')
+      setInvoices([])
     }
+    
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
+
+  // Fonction de rafraîchissement des données
+  const handleRefresh = async () => {
+    console.log('🔄 Rafraîchissement des factures...')
+    await fetchInvoices()
+  }
     fetchInvoices()
   }, [])
 
@@ -292,6 +301,15 @@ const FacturationPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-3">
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            title="Rafraîchir les données"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Actualiser</span>
+          </button>
           <button 
             onClick={() => setIsImportModalOpen(true)}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
