@@ -34,8 +34,8 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
 
   // Options disponibles pour le mode manuel
   const manualOptions = [
-    { value: 'non facturé', label: 'Non facturé' },
-    { value: 'facturé', label: 'Facturé' },
+    { value: 'non facture', label: 'Non facture' },
+    { value: 'facture', label: 'Facture' },
     { value: 'famille', label: 'Famille' }
   ]
 
@@ -125,7 +125,7 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
       await loadStatus()
       
       // Notifier le parent
-      onStatusChange?.(status?.valeur_automatique_calculee || 'non facturé', false)
+      onStatusChange?.(status?.valeur_automatique_calculee || 'non facture', false)
     } catch (err) {
       console.error('❌ Erreur dans removeOverride:', err)
       setError(err instanceof Error ? err.message : 'Erreur inconnue')
@@ -247,7 +247,7 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
             id="mode-manuel"
             name="facturation-mode"
             checked={isManualMode}
-            onChange={() => isManualMode || setManualOverride('non facturé')}
+            onChange={() => isManualMode || setManualOverride('non facture')}
             disabled={isUpdating}
             className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 mt-1"
           />

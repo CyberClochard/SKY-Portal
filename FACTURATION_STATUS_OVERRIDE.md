@@ -10,7 +10,7 @@ Le composant a été créé avec toutes les fonctionnalités demandées :
 
 1. **Interface Utilisateur Complète**
    - Radio buttons pour mode Automatique/Manuel
-   - Dropdown avec options : "non facturé", "facturé", "famille"
+   - Dropdown avec options : "non facture", "facture", "famille"
    - Bouton "Revenir en automatique" avec icône
    - Indicateurs visuels de mode manuel
    - Messages de feedback (succès/erreur)
@@ -53,7 +53,7 @@ Le composant a été intégré dans l'onglet **Finances** du `CaseModal.tsx` :
 
 Le composant utilise la vue `master_facturation_status` qui contient :
 - `DOSSIER` : ID du dossier
-- `FACTURE` : Statut actuel ("non facturé" | "facturé" | "famille")
+- `FACTURE` : Statut actuel ("non facture" | "facture" | "famille")
 - `FACTURE_MANUAL_OVERRIDE` : Boolean (true = mode manuel)
 - `mode_gestion` : "Manuel" | "Automatique"
 - `valeur_automatique_calculee` : Ce que serait le statut en auto
@@ -63,10 +63,10 @@ Le composant utilise la vue `master_facturation_status` qui contient :
 ```
 ╭─ Statut de Facturation ─────────────────────────────╮
 │                                                     │
-│ ○ Automatique: facturé                             │
+│ ○ Automatique: facture                             │
 │ ● Manuel: [famille ▼]  [Revenir en automatique]    │
 │                                                     │
-│ ⚠️ Différent de la valeur automatique (non facturé) │
+│ ⚠️ Différent de la valeur automatique (non facture) │
 │                                                     │
 ╰─────────────────────────────────────────────────────╯
 ```
@@ -129,7 +129,7 @@ await supabase
 ## **🔍 Cas d'Usage Couverts**
 
 ✅ **Dossier familial** : Sélectionner "famille" manuellement  
-✅ **Correction temporaire** : Forcer "non facturé" même avec factures  
+✅ **Correction temporaire** : Forcer "non facture" même avec factures  
 ✅ **Retour à la normale** : Repasser en mode automatique  
 ✅ **Synchronisation** : Refresh automatique des données  
 

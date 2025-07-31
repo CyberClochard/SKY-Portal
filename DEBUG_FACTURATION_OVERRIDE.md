@@ -115,13 +115,13 @@ Créer la vue dans Supabase SQL Editor :
 CREATE OR REPLACE VIEW master_facturation_status AS
 SELECT 
   DOSSIER,
-  COALESCE(FACTURE, 'non facturé') as FACTURE,
+  COALESCE(FACTURE, 'non facture') as FACTURE,
   COALESCE(FACTURE_MANUAL_OVERRIDE, false) as FACTURE_MANUAL_OVERRIDE,
   CASE 
     WHEN FACTURE_MANUAL_OVERRIDE = true THEN 'Manuel'
     ELSE 'Automatique'
   END as mode_gestion,
-  'non facturé' as valeur_automatique_calculee
+  'non facture' as valeur_automatique_calculee
 FROM MASTER;
 ```
 
@@ -131,7 +131,7 @@ Ajouter les colonnes à la table MASTER :
 
 ```sql
 -- Ajouter la colonne FACTURE si elle n'existe pas
-ALTER TABLE MASTER ADD COLUMN IF NOT EXISTS FACTURE text DEFAULT 'non facturé';
+ALTER TABLE MASTER ADD COLUMN IF NOT EXISTS FACTURE text DEFAULT 'non facture';
 
 -- Ajouter la colonne FACTURE_MANUAL_OVERRIDE si elle n'existe pas
 ALTER TABLE MASTER ADD COLUMN IF NOT EXISTS FACTURE_MANUAL_OVERRIDE boolean DEFAULT false;
