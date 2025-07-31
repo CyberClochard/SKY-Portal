@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { X, Info, Euro, FileText, Calendar, User, MapPin, Package, Truck, Building, Phone, Mail, Clock, AlertCircle, Save, Edit, Plus, Download, Upload, Plane, Ship, Trash2, Calculator, Receipt, CreditCard, Check } from 'lucide-react'
 import { formatDate } from '../utils/dateUtils'
 import { supabase } from '../lib/supabase'
+import FacturationStatusOverride from './FacturationStatusOverride'
 
 
 // Types pour les templates
@@ -1446,6 +1447,15 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
 
     return (
       <div className="space-y-4">
+        {/* Override du statut de facturation */}
+        <FacturationStatusOverride 
+          dossierId={dossier}
+          onStatusChange={(newStatus, isManual) => {
+            console.log('Statut de facturation modifié:', { newStatus, isManual })
+            // Ici on pourrait déclencher un refresh des données si nécessaire
+          }}
+        />
+        
         {/* Card 1: Ventes (pleine largeur) */}
         <Card>
           <CardHeader icon={<Euro className="w-5 h-5" />} title="Ventes" />
