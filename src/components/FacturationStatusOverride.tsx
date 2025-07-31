@@ -31,7 +31,6 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [isTestMode, setIsTestMode] = useState(false)
 
   // Options disponibles pour le mode manuel
   const manualOptions = [
@@ -40,37 +39,12 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
     { value: 'famille', label: 'Famille' }
   ]
 
-  // Données de test si les fonctions RPC ne sont pas disponibles
-  const createTestData = (): FacturationStatus => ({
-    DOSSIER: dossierId,
-    FACTURE: 'non facturé',
-    FACTURE_MANUAL_OVERRIDE: false,
-    mode_gestion: 'Automatique',
-    valeur_automatique_calculee: 'non facturé'
-  })
-
   // Charger le statut actuel
   const loadStatus = async () => {
     try {
       console.log('🔍 Chargement du statut pour le dossier:', dossierId)
       setIsLoading(true)
       setError(null)
-
-      // Test d'abord si la vue existe
-      const { data: testData, error: testError } = await supabase
-        .from('master_facturation_status')
-        .select('*')
-        .limit(1)
-
-      if (testError) {
-        console.error('❌ Vue master_facturation_status non trouvée:', testError)
-        console.log('🔄 Passage en mode test avec données factices')
-        setIsTestMode(true)
-        setStatus(createTestData())
-        return
-      }
-
-      console.log('✅ Vue master_facturation_status accessible')
 
       const { data, error: fetchError } = await supabase
         .from('master_facturation_status')
@@ -80,13 +54,6 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
 
       if (fetchError) {
         console.error('❌ Erreur lors du chargement du statut:', fetchError)
-        // Si pas de données pour ce dossier, créer des données de test
-        if (fetchError.code === 'PGRST116') {
-          console.log('🔄 Aucune donnée pour ce dossier, utilisation du mode test')
-          setIsTestMode(true)
-          setStatus(createTestData())
-          return
-        }
         throw new Error(`Erreur lors du chargement: ${fetchError.message}`)
       }
 
@@ -108,30 +75,14 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
       setError(null)
       setSuccessMessage(null)
 
-      if (isTestMode) {
-        // Mode test : simuler la mise à jour
-        console.log('🧪 Mode test : simulation de la mise à jour')
-        await new Promise(resolve => setTimeout(resolve, 500)) // Simuler un délai
-        setStatus(prev => prev ? {
-          ...prev,
-          FACTURE: nouvelleValeur,
-          FACTURE_MANUAL_OVERRIDE: true,
-          mode_gestion: 'Manuel'
-        } : null)
-        setSuccessMessage(`Statut manuel défini: ${nouvelleValeur} (mode test)`)
-        onStatusChange?.(nouvelleValeur, true)
-        return
-      }
-
-      // Test d'abord si la fonction RPC existe
-      const { data: testData, error: testError } = await supabase.rpc('set_master_facture_override', {
+      const { data, error: rpcError } = await supabase.rpc('set_master_facture_override', {
         dossier_id: dossierId,
         nouvelle_valeur: nouvelleValeur
       })
 
-      if (testError) {
-        console.error('❌ Fonction set_master_facture_override non trouvée:', testError)
-        throw new Error(`Fonction RPC non disponible: ${testError.message}`)
+      if (rpcError) {
+        console.error('❌ Erreur lors de la mise à jour:', rpcError)
+        throw new Error(`Erreur lors de la mise à jour: ${rpcError.message}`)
       }
 
       console.log('✅ Override défini avec succès')
@@ -158,29 +109,13 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
       setError(null)
       setSuccessMessage(null)
 
-      if (isTestMode) {
-        // Mode test : simuler la suppression
-        console.log('🧪 Mode test : simulation de la suppression')
-        await new Promise(resolve => setTimeout(resolve, 500)) // Simuler un délai
-        setStatus(prev => prev ? {
-          ...prev,
-          FACTURE: prev.valeur_automatique_calculee,
-          FACTURE_MANUAL_OVERRIDE: false,
-          mode_gestion: 'Automatique'
-        } : null)
-        setSuccessMessage('Retour au mode automatique (mode test)')
-        onStatusChange?.(status?.valeur_automatique_calculee || 'non facturé', false)
-        return
-      }
-
-      // Test d'abord si la fonction RPC existe
-      const { data: testData, error: testError } = await supabase.rpc('remove_master_facture_override', {
+      const { data, error: rpcError } = await supabase.rpc('remove_master_facture_override', {
         dossier_id: dossierId
       })
 
-      if (testError) {
-        console.error('❌ Fonction remove_master_facture_override non trouvée:', testError)
-        throw new Error(`Fonction RPC non disponible: ${testError.message}`)
+      if (rpcError) {
+        console.error('❌ Erreur lors de la suppression:', rpcError)
+        throw new Error(`Erreur lors de la suppression: ${rpcError.message}`)
       }
 
       console.log('✅ Override supprimé avec succès')
@@ -252,7 +187,7 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
 
   const isManualMode = status.FACTURE_MANUAL_OVERRIDE
 
-  console.log('🎨 Rendu du composant avec status:', status, 'isManualMode:', isManualMode, 'isTestMode:', isTestMode)
+  console.log('🎨 Rendu du composant avec status:', status, 'isManualMode:', isManualMode)
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -264,20 +199,12 @@ const FacturationStatusOverride: React.FC<FacturationStatusOverrideProps> = ({
             Statut de Facturation
           </h3>
         </div>
-        <div className="flex items-center space-x-2">
-          {isManualMode && (
-            <div className="flex items-center text-orange-600 dark:text-orange-400">
-              <Settings className="w-4 h-4 mr-1" />
-              <span className="text-sm font-medium">Mode manuel</span>
-            </div>
-          )}
-          {isTestMode && (
-            <div className="flex items-center text-blue-600 dark:text-blue-400">
-              <AlertCircle className="w-4 h-4 mr-1" />
-              <span className="text-sm font-medium">Mode test</span>
-            </div>
-          )}
-        </div>
+        {isManualMode && (
+          <div className="flex items-center text-orange-600 dark:text-orange-400">
+            <Settings className="w-4 h-4 mr-1" />
+            <span className="text-sm font-medium">Mode manuel</span>
+          </div>
+        )}
       </div>
 
       {/* Messages de feedback */}

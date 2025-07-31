@@ -18,37 +18,23 @@ L'utilisateur a signalé :
 
 ### Solutions Implémentées
 
-#### 1. Mode Test Automatique
-
-Le composant a été modifié pour passer automatiquement en "mode test" si les éléments backend ne sont pas disponibles :
-
-```typescript
-// Si la vue n'existe pas, passer en mode test
-if (testError) {
-  console.log('🔄 Passage en mode test avec données factices')
-  setIsTestMode(true)
-  setStatus(createTestData())
-  return
-}
-```
-
-#### 2. Logs de Débogage Détaillés
+#### 1. Logs de Débogage Détaillés
 
 Des logs détaillés ont été ajoutés pour identifier le problème :
 
 ```typescript
 console.log('🔍 Chargement du statut pour le dossier:', dossierId)
-console.log('✅ Vue master_facturation_status accessible')
+console.log('✅ Données chargées:', data)
 console.log('❌ Erreur dans loadStatus:', err)
 ```
 
-#### 3. Gestion d'Erreur Robuste
+#### 2. Gestion d'Erreur Robuste
 
-Le composant gère maintenant plusieurs types d'erreurs :
+Le composant gère maintenant les erreurs de manière claire :
 
-- Vue inexistante → Mode test
-- Fonctions RPC inexistantes → Mode test
-- Aucune donnée pour le dossier → Mode test
+- Vue inexistante → Affichage d'erreur
+- Fonctions RPC inexistantes → Affichage d'erreur
+- Aucune donnée pour le dossier → Affichage d'erreur
 - Erreurs réseau → Affichage d'erreur claire
 
 ## Instructions de Débogage
@@ -60,7 +46,6 @@ Ouvrir la console du navigateur (F12) et rechercher :
 - `🔍` : Début du chargement
 - `✅` : Succès
 - `❌` : Erreur
-- `🧪` : Mode test
 - `🎨` : Rendu du composant
 
 ### 2. Vérifier l'État du Composant
@@ -68,7 +53,6 @@ Ouvrir la console du navigateur (F12) et rechercher :
 Le composant affiche maintenant des indicateurs visuels :
 
 - **Mode manuel** : Icône orange avec "Mode manuel"
-- **Mode test** : Icône bleue avec "Mode test"
 - **Erreur** : Message d'erreur rouge avec détails
 
 ### 3. Tester les Fonctions Backend
@@ -155,31 +139,23 @@ ALTER TABLE MASTER ADD COLUMN IF NOT EXISTS FACTURE_MANUAL_OVERRIDE boolean DEFA
 
 ## Test du Composant
 
-### Mode Test
+### Fonctionnement Normal
 
-Le composant fonctionne en mode test même sans les éléments backend :
+Le composant fonctionne avec les vraies données backend :
 
 1. Affiche les boutons radio "Automatique" et "Manuel"
 2. Permet de passer en mode manuel
 3. Affiche le dropdown avec les options
-4. Simule les mises à jour avec des délais
+4. Effectue les vraies mises à jour via RPC
 5. Affiche les messages de succès
-
-### Mode Production
-
-Une fois les éléments backend créés :
-
-1. Le composant détecte automatiquement les fonctions disponibles
-2. Utilise les vraies données de la base
-3. Effectue les vraies mises à jour via RPC
-4. Synchronise avec les autres composants
+6. Synchronise avec les autres composants
 
 ## Vérification Visuelle
 
 Le composant devrait afficher :
 
 1. **En-tête** : "Statut de Facturation" avec icône Euro
-2. **Indicateurs** : "Mode manuel" ou "Mode test" si applicable
+2. **Indicateurs** : "Mode manuel" si applicable
 3. **Boutons radio** : "Automatique" et "Manuel" clairement visibles
 4. **Dropdown** : Visible uniquement en mode manuel
 5. **Bouton de retour** : Icône de rotation pour revenir en automatique
@@ -190,5 +166,5 @@ Le composant devrait afficher :
 1. **Vérifier les logs** dans la console du navigateur
 2. **Exécuter le script de test** dans Supabase
 3. **Créer les éléments manquants** si nécessaire
-4. **Tester le composant** en mode test puis production
+4. **Tester le composant** avec les vraies données
 5. **Vérifier l'intégration** dans le CaseModal 
