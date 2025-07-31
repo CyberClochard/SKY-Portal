@@ -107,8 +107,6 @@ const FacturationPage: React.FC = () => {
     console.log('🔄 Rafraîchissement des factures...')
     await fetchInvoices()
   }
-    fetchInvoices()
-  }, [])
 
   // Affiche les clés réelles des objets retournés par la vue
   if (invoices.length > 0) {
