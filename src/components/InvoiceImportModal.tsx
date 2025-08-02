@@ -77,7 +77,7 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
       const errorCount = results.filter(r => !r.success).length
       
       if (errorCount === 0) {
-        setUploadStatus('success')
+      setUploadStatus('success')
       } else if (successCount === 0) {
         setUploadStatus('error')
       } else {
@@ -231,9 +231,9 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
           {importResults.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                   Rapport d'importation
-                </h3>
+              </h3>
                 <div className="flex items-center space-x-4 text-sm">
                   <span className="text-green-600 dark:text-green-400">
                     ✅ {importResults.filter(r => r.success).length} succès
@@ -263,7 +263,7 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
                         )}
                         <span className="font-medium text-gray-900 dark:text-white">
                           {result.fileName}
-                        </span>
+                      </span>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded ${
                         result.success
@@ -345,7 +345,7 @@ const InvoiceImportModal: React.FC<InvoiceImportModalProps> = ({ isOpen, onClose
                         </summary>
                         <div className="mt-2 bg-white dark:bg-gray-800 p-2 rounded border text-xs font-mono text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
                           {result.response}
-                        </div>
+                    </div>
                       </details>
                     )}
                   </div>
