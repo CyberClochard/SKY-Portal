@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Plane, FileText, Save, Calendar, MapPin, ToggleLeft, ToggleRight, Search, X, RefreshCw } from 'lucide-react';
 import { CaseData } from '../types/booking';
+import { getAirlineByCode } from '../lib/supabase';
 
 interface FlightAutoCompleteData {
   carrierCode: string;
@@ -313,6 +314,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
   }
 
   const [hasConnection, setHasConnection] = useState(false)
+  const [isDraft, setIsDraft] = useState(false) // true = draft, false = confirmation
   const [formData, setFormData] = useState<CaseData>(
     initialData || {
       dossierNumber: `DOS-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000) + 100000}`,
@@ -439,7 +441,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
     }));
   };
 
-  const handleAutoComplete = (flightIndex: number, flightData: any) => {
+  const handleAutoComplete = async (flightIndex: number, flightData: any) => {
     console.log('Auto-complétion reçue pour vol', flightIndex + 1, ':', flightData);
     
     // Mapper les données reçues du webhook vers les champs du formulaire
@@ -458,12 +460,42 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
       return dateStr; // Retourner tel quel si le format n'est pas reconnu
     };
 
+    // Fonction helper pour extraire le code compagnie aérienne et mapper vers le nom
+    const mapAirlineFromFlightNumber = async (flightNumber: string) => {
+      if (!flightNumber || flightNumber.length < 2) {
+        return formData.flights[flightIndex].airline;
+      }
+      
+      try {
+        // Extraire les 2 premiers caractères comme code IATA
+        const airlineCode = flightNumber.substring(0, 2).toUpperCase();
+        console.log('Code compagnie extrait:', airlineCode);
+        
+        // Rechercher la compagnie dans AirlinesDirectory
+        const airline = await getAirlineByCode(airlineCode);
+        
+        if (airline && airline.name) {
+          console.log('Compagnie trouvée:', airline.name);
+          return airline.name;
+        } else {
+          console.log('Aucune compagnie trouvée pour le code:', airlineCode);
+          return formData.flights[flightIndex].airline;
+        }
+      } catch (error) {
+        console.error('Erreur lors du mapping de la compagnie:', error);
+        return formData.flights[flightIndex].airline;
+      }
+    };
+
+    // Mapper automatiquement la compagnie aérienne
+    const airlineName = await mapAirlineFromFlightNumber(flightData['N° de vol']);
+
     const updatedFlight = {
       ...formData.flights[flightIndex],
       // Mapping des champs selon les variables reçues du webhook
       flightNumber: flightData['N° de vol'] || formData.flights[flightIndex].flightNumber,
-      // Note: airline n'est pas fournie par le webhook, on garde la valeur existante
-      airline: formData.flights[flightIndex].airline,
+      // Mapping automatique de la compagnie aérienne à partir du N° de vol
+      airline: airlineName,
       // Note: aircraft et duration ne sont pas fournis, on garde les valeurs existantes
       aircraft: formData.flights[flightIndex].aircraft,
       duration: formData.flights[flightIndex].duration,
@@ -524,6 +556,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
       deceasedName: formData.deceased.name,
       ltaNumber: formData.awbNumber,
       connectionFlight: hasConnection,
+      draft: isDraft,
       
       // Flight 1 - Always present
       airline1: formData.flights[0]?.airline || '',
@@ -620,23 +653,45 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmit, initialData, isSubm
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Informations de vol</h3>
             </div>
             
-            {/* Connection Toggle */}
-            <div className="flex items-center space-x-3">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Vol direct</span>
-              <button
-                type="button"
-                onClick={initializeConnectionFlight}
-                className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                  hasConnection ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
-                    hasConnection ? 'translate-x-6' : 'translate-x-1'
+            {/* Toggles Container */}
+            <div className="flex flex-col space-y-3">
+              {/* Connection Toggle */}
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Vol direct</span>
+                <button
+                  type="button"
+                  onClick={initializeConnectionFlight}
+                  className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    hasConnection ? 'bg-blue-600' : 'bg-orange-500 dark:bg-orange-600'
                   }`}
-                />
-              </button>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Connexion</span>
+                >
+                  <span
+                    className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                      hasConnection ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Connexion</span>
+              </div>
+
+              {/* Draft/Confirmation Toggle */}
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Draft</span>
+                <button
+                  type="button"
+                  onClick={() => setIsDraft(!isDraft)}
+                  className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                    !isDraft ? 'bg-green-600' : 'bg-purple-500 dark:bg-purple-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                      !isDraft ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Confirmation</span>
+              </div>
             </div>
           </div>
 

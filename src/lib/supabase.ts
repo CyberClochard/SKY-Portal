@@ -377,6 +377,30 @@ export const searchAirlines = async (searchTerm: string) => {
   }
 }
 
+// Helper function to get airline by IATA code (2 letters)
+export const getAirlineByCode = async (code: string) => {
+  try {
+    console.log('Looking for airline with IATA code:', code)
+    
+    const { data, error } = await supabase
+      .from('AirlinesDirectory')
+      .select('*')
+      .eq('code', code.toUpperCase())
+      .single()
+
+    if (error) {
+      console.log('No airline found for IATA code:', code)
+      return null
+    }
+
+    console.log('Found airline:', data)
+    return data
+  } catch (err) {
+    console.error('Error fetching airline by code:', err)
+    return null
+  }
+}
+
 // Helper function to get all airlines
 export const getAllAirlines = async () => {
   try {
