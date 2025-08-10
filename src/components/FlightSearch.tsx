@@ -610,34 +610,6 @@ function FlightSearch({ n8nBaseUrl }: FlightSearchProps) {
         </div>
       )}
 
-      {/* N8n Configuration Status */}
-      {isN8nConfigured ? (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-          <div className="flex items-center space-x-3">
-            <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <div>
-              <p className="font-medium text-blue-800 dark:text-blue-200">Webhook de recherche de vols</p>
-              <p className="text-sm text-blue-700 dark:text-blue-300 font-mono">
-                {currentN8nBaseUrl}/webhook/1f5a8aaf-64cd-49a2-b56c-95d7554a17dc
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                Recherche de vols via API Amadeus depuis Paris (ORY/CDG) - Support vols directs et avec escales
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-          <div className="flex items-center space-x-2 text-yellow-600 dark:text-yellow-400">
-            <Settings className="w-5 h-5" />
-            <div>
-              <p className="font-medium">Configuration n8n requise</p>
-              <p className="text-sm mt-1">Veuillez configurer l'URL de base n8n dans la section "Workflows n8n" pour effectuer des recherches de vols.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Debug Info (only show when there's an error and debug data) */}
       {debugInfo && error && (
         <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -1129,32 +1101,6 @@ function FlightSearch({ n8nBaseUrl }: FlightSearchProps) {
           </p>
         </div>
       )}
-
-      {/* Configuration Help */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Configuration du webhook de recherche</h3>
-        <div className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
-          <p>• <strong>Webhook configuré :</strong></p>
-          <div className="ml-4 space-y-1 font-mono text-xs bg-blue-100 dark:bg-blue-900/30 p-2 rounded">
-            <p>URL: {isN8nConfigured ? `${currentN8nBaseUrl}/webhook/1f5a8aaf-64cd-49a2-b56c-95d7554a17dc` : 'Configuration requise'}</p>
-            <p>Méthode: POST (JSON)</p>
-            <p>Headers: originlocationcode, destinationlocationcode, date, directflightsonly, selectedairline</p>
-          </div>
-          <p>• <strong>Données envoyées :</strong> originCode, destinationCode, departureDate, directFlightsOnly, selectedAirline, source, timestamp</p>
-          <p>• <strong>Réponse attendue :</strong> Array de vols avec format segments S0/S1 pour les connexions</p>
-          <p>• <strong>Format segments :</strong> FlightNumberS0, AirportOfDepartureS0, DepartureTimeS0, AirportOfArrivalS0, ArrivalTimeS0, AircraftTypeS0</p>
-          <p>• <strong>Connexions :</strong> S1 pour le deuxième segment (FlightNumberS1, AirportOfDepartureS1, etc.)</p>
-          <p>• <strong>Aéroports supportés :</strong> ORY (Paris Orly), CDG (Charles de Gaulle)</p>
-          <p>• <strong>Compagnies disponibles :</strong> AH (Air Algérie), TK (Turkish Airlines), PC (Pegasus), TU (Tunisair), AT (Royal Air Maroc), QR (Qatar Airways), VF (AJet), SS (Corsair), HC (Air Sénégal), 5O (ASL Airlines), PK (Pakistan Intl), ET (Ethiopian), MS (EgyptAir)</p>
-          <p>• <strong>Types d'avions :</strong> Détection automatique des codes IATA (320→Airbus A320, 73H→Boeing 737-800, etc.)</p>
-          <p>• <strong>Options de vol :</strong> Vols directs uniquement ou incluant les escales avec affichage détaillé des segments</p>
-          {!isN8nConfigured && (
-            <p className="text-yellow-700 dark:text-yellow-300">
-              ⚠️ <strong>Action requise :</strong> Configurez l'URL n8n dans la section "Workflows n8n"
-            </p>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
