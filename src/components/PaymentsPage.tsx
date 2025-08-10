@@ -6,7 +6,7 @@ import ManualAllocationModal from './ManualAllocationModal'
 import PaymentAllocationTable from './PaymentAllocationTable'
 import SearchAndFilters from './SearchAndFilters'
 import SortableTable, { SortableColumn } from './SortableTable'
-import DatabaseDiagnostic from './DatabaseDiagnostic'
+
 import { Plus, Euro, FileText, CreditCard, Calendar, User, Eye, Trash2, Edit, RefreshCw } from 'lucide-react'
 import { formatDate } from '../utils/dateUtils'
 
@@ -357,9 +357,6 @@ const PaymentsPage: React.FC = () => {
           </button>
         </div>
       </div>
-
-             {/* Diagnostic de la base de données */}
-       <DatabaseDiagnostic onDataFixed={refetch} />
 
       {/* Modal de formulaire de paiement */}
       <PaymentForm

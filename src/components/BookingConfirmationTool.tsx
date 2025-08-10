@@ -1,7 +1,22 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Printer, Edit, FileText, AlertCircle, CheckCircle, RefreshCw, Eye } from 'lucide-react';
+import { Document, Page, pdfjs } from 'react-pdf';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import BookingForm from './BookingForm';
 import { CaseData } from '../types/booking';
+
+// Configuration PDF.js
+const configurePdfWorker = () => {
+  // Vérifier le support des Web Workers
+  if (typeof Worker !== 'undefined') {
+    // Utiliser l'import direct avec ?url pour éviter les problèmes de résolution
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+  } else {
+    console.warn('⚠️ Web Workers non supportés - utilisation du fake worker');
+  }
+};
 
 const BookingConfirmationTool: React.FC = () => {
   const [currentData, setCurrentData] = useState<CaseData | null>(null);
@@ -11,6 +26,40 @@ const BookingConfirmationTool: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [scale, setScale] = useState<number>(1.0);
+  const [useIframeFallback, setUseIframeFallback] = useState<boolean>(false);
+
+  // Configuration PDF.js au montage du composant
+  useEffect(() => {
+    configurePdfWorker();
+  }, []);
+
+  // Fonction pour vérifier l'intégrité du PDF
+  const validatePdfData = (arrayBuffer: ArrayBuffer): boolean => {
+    try {
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Vérifier la signature PDF (%PDF)
+      const firstBytes = Array.from(uint8Array.slice(0, 10)).map(b => String.fromCharCode(b)).join('');
+      const hasPdfSignature = firstBytes.startsWith('%PDF');
+      
+      // Vérifier la taille minimale (un PDF valide doit faire au moins quelques KB)
+      const hasValidSize = arrayBuffer.byteLength > 1000;
+      
+      // Vérifier la fin du PDF (%%EOF)
+      const lastBytes = Array.from(uint8Array.slice(-10)).map(b => String.fromCharCode(b)).join('');
+      const hasPdfEnding = lastBytes.includes('%%EOF');
+      
+
+      
+      return hasPdfSignature && hasValidSize;
+    } catch (error) {
+      console.error('Erreur lors de la validation du PDF:', error);
+      return false;
+    }
+  };
 
   const handleFormSubmit = async (data: CaseData) => {
     setIsGenerating(true);
@@ -63,13 +112,10 @@ const BookingConfirmationTool: React.FC = () => {
         source: 'SkyLogistics Dashboard'
       }
 
-      console.log('Envoi des données au webhook n8n:', webhookData);
-
       // Envoyer la requête au webhook n8n
       let response;
       try {
         // Test de connectivité préalable
-        console.log('Test de connectivité vers n8n.skylogistics.fr...');
         
         const webhookUrl = 'https://n8n.skylogistics.fr/webhook/1af37111-e368-4545-a1e5-b07066c5dcaa';
         
@@ -83,8 +129,6 @@ const BookingConfirmationTool: React.FC = () => {
           signal: AbortSignal.timeout(45000) // 45 second timeout
         });
         
-        console.log('Connexion établie avec n8n, statut:', response.status);
-        
       } catch (fetchError) {
         console.error('Erreur de connexion au webhook:', fetchError);
         
@@ -94,8 +138,6 @@ const BookingConfirmationTool: React.FC = () => {
         if (fetchError instanceof Error) {
           const errorName = fetchError.name;
           const errorMsg = fetchError.message;
-          
-          console.log('Type d\'erreur:', errorName, 'Message:', errorMsg);
           
           if (errorName === 'AbortError' || errorName === 'TimeoutError') {
             errorMessage += '⏱️ TIMEOUT (45s dépassé)\n';
@@ -141,16 +183,18 @@ const BookingConfirmationTool: React.FC = () => {
         throw new Error(errorMessage);
       }
 
-      console.log('Réponse du webhook:', response.status, response.statusText);
-      console.log('Headers de réponse:', Object.fromEntries(response.headers.entries()));
-
       if (!response.ok) {
         throw new Error(`Erreur webhook: ${response.status} ${response.statusText}`);
       }
 
+      // Cloner la réponse pour pouvoir la lire plusieurs fois
+      const responseClone = response.clone();
+      
+      // Lire d'abord comme ArrayBuffer pour analyser le contenu
+      const arrayBuffer = await response.arrayBuffer();
+      
       // Vérifier le type de contenu de la réponse
       const contentType = response.headers.get('content-type') || '';
-      console.log('Type de contenu de la réponse:', contentType);
       
       // Vérifier si c'est une réponse JSON vide malgré un PDF généré
       if (contentType.includes('application/json') && arrayBuffer.byteLength <= 10) {
@@ -166,29 +210,74 @@ Veuillez vérifier dans n8n :
 Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
         }
       }
-
-      // Cloner la réponse pour pouvoir la lire plusieurs fois
-      const responseClone = response.clone();
-      
-      // Lire d'abord comme ArrayBuffer pour analyser le contenu
-      const arrayBuffer = await response.arrayBuffer();
-      console.log('Taille du contenu reçu:', arrayBuffer.byteLength, 'bytes');
       
       // Vérifier les premiers bytes pour détecter un PDF (signature PDF: %PDF)
       const uint8Array = new Uint8Array(arrayBuffer);
       const firstBytes = Array.from(uint8Array.slice(0, 10)).map(b => String.fromCharCode(b)).join('');
-      console.log('Premiers caractères du contenu:', firstBytes);
       const isPdfSignature = firstBytes.startsWith('%PDF');
-      console.log('Signature PDF détectée:', isPdfSignature);
       
       // Si c'est un PDF (par signature ou type de contenu)
       if (isPdfSignature || contentType.includes('application/pdf')) {
-        console.log('Traitement comme PDF...');
+        // Valider l'intégrité du PDF avant de créer le blob
+        if (!validatePdfData(arrayBuffer)) {
+          throw new Error('Le PDF reçu semble corrompu ou invalide. Vérifiez la génération côté n8n.');
+        }
+        
         const pdfBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
-        console.log('PDF Blob créé:', pdfBlob.size, 'bytes, type:', pdfBlob.type);
+        
+        console.log('PDF détecté par signature ou type:', {
+          isPdfSignature,
+          contentType,
+          blobSize: pdfBlob.size,
+          blobType: pdfBlob.type,
+          firstBytes,
+          validationPassed: true
+        });
+        
+        // Vérifier que le blob est vraiment un PDF en testant sa lecture
+        try {
+          const testReader = new FileReader();
+          testReader.onload = () => {
+            if (testReader.result instanceof ArrayBuffer) {
+              const testArray = new Uint8Array(testReader.result);
+              const testFirstBytes = Array.from(testArray.slice(0, 10)).map(b => String.fromCharCode(b)).join('');
+              console.log('Test de lecture du blob - premiers bytes:', testFirstBytes);
+              
+              if (!testFirstBytes.startsWith('%PDF')) {
+                console.error('Le blob créé ne semble pas être un PDF valide');
+                setError('Le fichier généré ne semble pas être un PDF valide');
+                return;
+              }
+            }
+          };
+          testReader.readAsArrayBuffer(pdfBlob);
+        } catch (blobTestError) {
+          console.error('Erreur lors du test de lecture du blob:', blobTestError);
+        }
         
         setPdfBlob(pdfBlob);
         const url = URL.createObjectURL(pdfBlob);
+        
+        // Tester que l'URL est accessible
+        try {
+          const testResponse = await fetch(url);
+          if (!testResponse.ok) {
+            throw new Error(`Impossible d'accéder au blob URL: ${testResponse.status}`);
+          }
+          console.log('Blob URL test réussi:', url);
+          
+          // Tester que le contenu est bien un PDF
+          const testBlob = await testResponse.blob();
+          console.log('Test blob récupéré:', {
+            size: testBlob.size,
+            type: testBlob.type,
+            matchesOriginal: testBlob.size === pdfBlob.size
+          });
+          
+        } catch (testError) {
+          console.error('Erreur lors du test du blob URL:', testError);
+        }
+        
         setPdfUrl(url);
         setCurrentData(data);
         setShowForm(false);
@@ -197,24 +286,55 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
       }
       
       // Sinon, essayer de traiter comme JSON
-      console.log('Pas de PDF détecté, traitement comme JSON...');
       try {
         // Utiliser la réponse clonée pour lire comme texte
         const responseText = await responseClone.text();
-        console.log('Contenu reçu (texte):', responseText.substring(0, 500))
         
         let result
         try {
           result = JSON.parse(responseText)
-          console.log('Réponse JSON parsée:', result)
         } catch (parseError) {
           console.error('Erreur de parsing JSON:', parseError)
           // Si ce n'est ni PDF ni JSON valide, mais que le contenu semble être du binaire
           if (arrayBuffer.byteLength > 1000) {
-            console.log('Contenu binaire détecté, tentative de traitement comme PDF...');
+            // Valider l'intégrité du PDF avant de créer le blob
+            if (!validatePdfData(arrayBuffer)) {
+              console.warn('Contenu binaire détecté mais validation PDF échouée');
+              // Continuer quand même car c'est un fallback
+            }
+            
             const pdfBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
+            
+            console.log('PDF détecté par taille binaire:', {
+              byteLength: arrayBuffer.byteLength,
+              blobSize: pdfBlob.size,
+              blobType: pdfBlob.type,
+              validationPassed: validatePdfData(arrayBuffer)
+            });
+            
             setPdfBlob(pdfBlob);
             const url = URL.createObjectURL(pdfBlob);
+            
+            // Tester que l'URL est accessible
+            try {
+              const testResponse = await fetch(url);
+              if (!testResponse.ok) {
+                throw new Error(`Impossible d'accéder au blob URL: ${testResponse.status}`);
+              }
+              console.log('Blob URL test réussi (binaire):', url);
+              
+              // Tester que le contenu est bien un PDF
+              const testBlob = await testResponse.blob();
+              console.log('Test blob récupéré (binaire):', {
+                size: testBlob.size,
+                type: testBlob.type,
+                matchesOriginal: testBlob.size === pdfBlob.size
+              });
+              
+            } catch (testError) {
+              console.error('Erreur lors du test du blob URL (binaire):', testError);
+            }
+            
             setPdfUrl(url);
             setCurrentData(data);
             setShowForm(false);
@@ -236,7 +356,6 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
         
         if (result.pdfUrl) {
           // URL PDF dans la réponse JSON
-          console.log('URL PDF reçue:', result.pdfUrl)
           const pdfResponse = await fetch(result.pdfUrl)
           if (pdfResponse.ok) {
             const pdfBlob = await pdfResponse.blob()
@@ -251,7 +370,6 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
           }
         } else if (result.pdfData) {
           // Données PDF en base64
-          console.log('Données PDF base64 reçues')
           const binaryString = atob(result.pdfData)
           const bytes = new Uint8Array(binaryString.length)
           for (let i = 0; i < binaryString.length; i++) {
@@ -266,7 +384,6 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
           setSuccess('Document PDF généré avec succès')
         } else {
           // Pas de PDF trouvé dans la réponse
-          console.warn('Aucun PDF trouvé dans la réponse:', result)
           setCurrentData(data)
           setShowForm(false)
           setError(result.message || 'Le workflow a démarré mais aucun PDF n\'a été généré. Vérifiez la configuration du webhook n8n.')
@@ -295,6 +412,7 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
       URL.revokeObjectURL(pdfUrl)
       setPdfUrl(null)
     }
+    setUseIframeFallback(false);
   };
 
   const handleDownloadPdf = () => {
@@ -310,17 +428,42 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
 
   const handlePrintPdf = () => {
     if (pdfUrl) {
-      // Ouvrir le PDF dans une nouvelle fenêtre pour impression
-      const printWindow = window.open(pdfUrl, '_blank', 'width=800,height=600')
+      const printWindow = window.open(pdfUrl, '_blank');
       if (printWindow) {
         printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.focus()
-            printWindow.print()
-          }, 500)
-        }
+          printWindow.print();
+        };
       }
     }
+  };
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setPageNumber(1);
+  };
+
+  const changePage = (offset: number) => {
+    setPageNumber(prevPageNumber => prevPageNumber + offset);
+  };
+
+  const previousPage = () => {
+    changePage(-1);
+  };
+
+  const nextPage = () => {
+    changePage(1);
+  };
+
+  const zoomIn = () => {
+    setScale(prevScale => Math.min(prevScale + 0.2, 3.0));
+  };
+
+  const zoomOut = () => {
+    setScale(prevScale => Math.max(prevScale - 0.2, 0.5));
+  };
+
+  const resetZoom = () => {
+    setScale(1.0);
   };
 
   return (
@@ -329,7 +472,7 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
         <div className="max-w-6xl mx-auto">
           <BookingForm 
             onSubmit={handleFormSubmit} 
-            initialData={currentData} 
+            initialData={currentData || undefined} 
             isSubmitting={isGenerating}
           />
         </div>
@@ -425,51 +568,194 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
                 </div>
                 
                 <div className="relative">
-                  {/* PDF Viewer avec fallback */}
-                  <div className="w-full h-[800px] bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center">
-                    <div className="text-center space-y-4">
-                      <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
-                        <FileText className="w-10 h-10 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                          Document PDF généré avec succès
-                        </h3>
-                        <p className="text-gray-600 dark:text-gray-400 mb-4">
-                          Le document est prêt à être téléchargé ou imprimé.
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
-                          Taille: {pdfBlob ? `${(pdfBlob.size / 1024).toFixed(1)} KB` : 'Inconnue'}
-                        </p>
-                      </div>
-                      
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <button 
-                          onClick={handleDownloadPdf}
-                          className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                        >
-                          <Download className="w-5 h-5" />
-                          <span>Télécharger le PDF</span>
-                        </button>
+                  {/* PDF Viewer embedded avec react-pdf */}
+                  <div className="w-full h-[800px] border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    {pdfBlob && pdfUrl ? (
+                      <div className="w-full h-full flex flex-col">
+                        {/* PDF Viewer Header avec contrôles */}
+                        <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <FileText className="w-5 h-5 text-blue-600" />
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Aperçu du document PDF
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                ({pdfBlob ? `${(pdfBlob.size / 1024).toFixed(1)} KB` : ''})
+                              </span>
+                            </div>
+                            
+                            {/* Contrôles de navigation et zoom */}
+                            <div className="flex items-center space-x-3">
+                              {/* Navigation des pages */}
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={previousPage}
+                                  disabled={pageNumber <= 1}
+                                  className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600"
+                                >
+                                  Précédent
+                                </button>
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  Page {pageNumber} sur {numPages || '...'}
+                                </span>
+                                <button
+                                  onClick={nextPage}
+                                  disabled={pageNumber >= (numPages || 1)}
+                                  className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600"
+                                >
+                                  Suivant
+                                </button>
+                              </div>
+                              
+                              {/* Contrôles de zoom */}
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={zoomOut}
+                                  className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                                >
+                                  -
+                                </button>
+                                <span className="text-xs text-gray-600 dark:text-gray-400 min-w-[40px] text-center">
+                                  {Math.round(scale * 100)}%
+                                </span>
+                                <button
+                                  onClick={zoomIn}
+                                  className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  onClick={resetZoom}
+                                  className="px-2 py-1 text-xs bg-blue-200 dark:bg-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-300 dark:hover:bg-blue-600"
+                                >
+                                  Reset
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         
-                        <button 
-                          onClick={handlePrintPdf}
-                          className="flex items-center space-x-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors"
-                        >
-                          <Printer className="w-5 h-5" />
-                          <span>Ouvrir et Imprimer</span>
-                        </button>
+                        {/* PDF Content avec react-pdf */}
+                        <div className="flex-1 bg-gray-100 dark:bg-gray-900 overflow-auto p-4">
+                          <div className="flex justify-center">
+                            {!useIframeFallback ? (
+                              <>
+                                {/* Vérification du worker PDF.js */}
+                                {!pdfjs.GlobalWorkerOptions.workerSrc ? (
+                                  <div className="text-center p-8 text-red-600 dark:text-red-400">
+                                    <AlertCircle className="w-16 h-16 mx-auto mb-4" />
+                                    <p>Erreur de configuration PDF.js</p>
+                                    <p className="text-sm mt-2">Le worker PDF.js n'est pas configuré</p>
+                                    <button
+                                      onClick={() => setUseIframeFallback(true)}
+                                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                    >
+                                      Utiliser l'affichage iframe
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div>
+
+                                    
+                                    <Document
+                                      file={pdfUrl}
+                                      onLoadSuccess={onDocumentLoadSuccess}
+                                                                            onLoadError={(error) => {
+                                        console.error('Erreur de chargement du PDF:', error);
+                                        setError('Erreur lors du chargement du PDF');
+                                      }}
+
+                                      loading={
+                                        <div className="flex items-center justify-center p-8">
+                                          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                                          <span className="ml-2 text-gray-600 dark:text-gray-400">Chargement du PDF...</span>
+                                        </div>
+                                      }
+                                      error={
+                                        <div className="text-center p-8 text-red-600 dark:text-red-400">
+                                          <AlertCircle className="w-16 h-16 mx-auto mb-4" />
+                                          <p>Erreur lors du chargement du PDF</p>
+                                          <p className="text-sm mt-2">Utilisez les boutons d'action ci-dessous</p>
+
+                                          <button
+                                            onClick={() => setUseIframeFallback(true)}
+                                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                          >
+                                            Essayer l'affichage iframe
+                                          </button>
+                                        </div>
+                                      }
+                                    >
+                                      <Page
+                                        pageNumber={pageNumber}
+                                        scale={scale}
+                                        renderTextLayer={true}
+                                        renderAnnotationLayer={true}
+                                        className="shadow-lg"
+
+                                      />
+                                    </Document>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="w-full h-full">
+                                <div className="mb-4 text-center">
+                                  <button
+                                    onClick={() => setUseIframeFallback(false)}
+                                    className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                                  >
+                                    Retour à react-pdf
+                                  </button>
+                                </div>
+                                <iframe
+                                  src={pdfUrl}
+                                  className="w-full h-full border-0"
+                                  title="Aperçu PDF"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
                         
-                        <button 
-                          onClick={() => window.open(pdfUrl, '_blank')}
-                          className="flex items-center space-x-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                        >
-                          <Eye className="w-5 h-5" />
-                          <span>Ouvrir dans un nouvel onglet</span>
-                        </button>
+                        {/* Boutons d'action en bas */}
+                        <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex flex-wrap gap-3 justify-center">
+                            <button 
+                              onClick={handleDownloadPdf}
+                              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Télécharger</span>
+                            </button>
+                            
+                            <button 
+                              onClick={handlePrintPdf}
+                              className="flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors text-sm"
+                            >
+                              <Printer className="w-4 h-4" />
+                              <span>Imprimer</span>
+                            </button>
+                            
+                            <button 
+                              onClick={() => window.open(pdfUrl, '_blank')}
+                              className="flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span>Ouvrir dans un nouvel onglet</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="w-full h-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                        <div className="text-center text-gray-500 dark:text-gray-400">
+                          <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                          <p>Aucun document PDF à afficher</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -495,25 +781,6 @@ Configuration actuelle : Renvoie "${textContent}" au lieu du PDF binaire.`);
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Debug Info (en développement) */}
-          {(process.env.NODE_ENV === 'development' || true) && (
-            <div className="mt-6 max-w-6xl mx-auto">
-              <details className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                <summary className="cursor-pointer font-medium text-gray-900 dark:text-white mb-2">
-                  Informations de débogage
-                </summary>
-                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-                  <p><strong>PDF Blob:</strong> {pdfBlob ? `${pdfBlob.size} bytes` : 'Aucun'}</p>
-                  <p><strong>PDF URL:</strong> {pdfUrl ? 'Généré' : 'Aucune'}</p>
-                  <p><strong>Données actuelles:</strong> {currentData ? 'Présentes' : 'Aucunes'}</p>
-                  <p><strong>État génération:</strong> {isGenerating ? 'En cours' : 'Terminé'}</p>
-                  <p><strong>Erreur:</strong> {error || 'Aucune'}</p>
-                  <p><strong>Succès:</strong> {success || 'Aucun'}</p>
-                </div>
-              </details>
             </div>
           )}
         </div>
