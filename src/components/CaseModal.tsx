@@ -3,6 +3,7 @@ import { X, Info, Euro, FileText, Calendar, User, MapPin, Package, Truck, Buildi
 import { formatDate } from '../utils/dateUtils'
 import { supabase } from '../lib/supabase'
 import UnifiedOverrideControl from './UnifiedOverrideControl'
+import FinanceNotesCard from './FinanceNotesCard'
 
 
 // Types pour les templates
@@ -183,6 +184,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
   const [initialAchatsPrevisionnels, setInitialAchatsPrevisionnels] = useState<LigneAchat[]>([])
   const [initialAchatsReels, setInitialAchatsReels] = useState<LigneAchat[]>([])
   const [initialReglements, setInitialReglements] = useState<Reglement[]>([])
+  const [isManualMode, setIsManualMode] = useState(false)
 
 
 
@@ -1450,8 +1452,13 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
         {/* Contrôle unifié des overrides */}
         <UnifiedOverrideControl 
           dossierId={dossier}
+          onInitialStatus={(factureStatus, reglementStatus, isManual) => {
+            console.log('Statut initial reçu:', { factureStatus, reglementStatus, isManual })
+            setIsManualMode(isManual)
+          }}
           onStatusChange={(newFactureStatus, newReglementStatus, isManual) => {
             console.log('Statuts modifiés:', { newFactureStatus, newReglementStatus, isManual })
+            setIsManualMode(isManual)
             // Ici on pourrait déclencher un refresh des données si nécessaire
           }}
         />
@@ -1638,30 +1645,35 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
           </Card>
         </div>
 
-        {/* Card 4: Règlements (pleine largeur) */}
-        <Card>
-          <CardHeader 
-            icon={<CreditCard className="w-5 h-5" />} 
-            title="Règlements"
-            actions={
-              <button onClick={ajouterReglement} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                + Nouveau règlement
-              </button>
-            }
-          />
-          <CardContent>
+        {/* Card 4: Règlements ou Notes selon le mode */}
+        {isManualMode ? (
+          // Mode manuel : Affichage de la carte Notes
+          <FinanceNotesCard dossierId={dossier} />
+        ) : (
+          // Mode automatique : Affichage de la carte Règlements
+          <Card>
+            <CardHeader 
+              icon={<CreditCard className="w-5 h-5" />} 
+              title="Règlements"
+              actions={
+                <button onClick={ajouterReglement} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
+                  + Nouveau règlement
+                </button>
+              }
+            />
+            <CardContent>
 
-            {/* Tableau des règlements */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-600">
-                    <th className="text-left py-2">Date</th>
-                    <th className="text-left py-2">Montant</th>
-                    <th className="text-left py-2">Mode</th>
-                    <th className="text-left py-2">Référence</th>
-                    <th className="text-left py-2">Statut</th>
-                    <th className="text-left py-2">Actions</th>
+              {/* Tableau des règlements */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-600">
+                      <th className="text-left py-2">Date</th>
+                      <th className="text-left py-2">Montant</th>
+                      <th className="text-left py-2">Mode</th>
+                      <th className="text-left py-2">Référence</th>
+                      <th className="text-left py-2">Statut</th>
+                      <th className="text-left py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1765,6 +1777,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
     )
   }

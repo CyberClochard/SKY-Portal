@@ -349,6 +349,83 @@ const DataTable: React.FC = () => {
     document.body.removeChild(link)
   }
 
+  // Fonction pour générer les pastilles de couleur pour FACTURE et REGLEMENT
+  const getStatusBadge = (value: any, columnName: string) => {
+    if (value === null || value === undefined) return '-'
+    
+    // Colonne FACTURE
+    if (columnName === 'FACTURE') {
+      const factureValue = value.toString().toLowerCase()
+      let colorClass = ''
+      let bgColorClass = ''
+      
+      switch (factureValue) {
+        case 'famille':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-blue-600'
+          break
+        case 'non facture':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-gray-600'
+          break
+        case 'facture':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-green-600'
+          break
+        case 'partielle':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-orange-600'
+          break
+        default:
+          colorClass = 'text-white'
+          bgColorClass = 'bg-gray-600'
+      }
+      
+      return (
+        <div className={`w-full h-full flex items-center justify-center px-3 py-2 rounded-lg text-sm font-bold ${colorClass} ${bgColorClass} min-h-[2.5rem]`}>
+          {value}
+        </div>
+      )
+    }
+    
+    // Colonne REGLEMENT
+    if (columnName === 'REGLEMENT') {
+      const reglementValue = value.toString().toLowerCase()
+      let colorClass = ''
+      let bgColorClass = ''
+      
+      switch (reglementValue) {
+        case 'paid':
+        case 'payé':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-green-600'
+          break
+        case 'unpaid':
+        case 'non payé':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-red-600'
+          break
+        case 'partial':
+        case 'partiellement payé':
+          colorClass = 'text-white'
+          bgColorClass = 'bg-orange-600'
+          break
+        default:
+          colorClass = 'text-white'
+          bgColorClass = 'bg-gray-600'
+      }
+      
+      return (
+        <div className={`w-full h-full flex items-center justify-center px-3 py-2 rounded-lg text-sm font-bold ${colorClass} ${bgColorClass} min-h-[2.5rem]`}>
+          {value}
+        </div>
+      )
+    }
+    
+    // Pour les autres colonnes, retourner la valeur formatée normalement
+    return formatCellValue(value, columnName)
+  }
+
   const formatCellValue = (value: any, columnName: string) => {
     if (value === null || value === undefined) return '-'
     
@@ -804,7 +881,7 @@ const DataTable: React.FC = () => {
                                   column === 'DEPART' || column === 'ARRIVEE' ? 'font-mono text-gray-900 dark:text-white' :
                                   'text-gray-900 dark:text-white'
                                 }`}>
-                                  {formatCellValue(record[column], column)}
+                                  {getStatusBadge(record[column], column)}
                                 </div>
                               )}
                             </td>

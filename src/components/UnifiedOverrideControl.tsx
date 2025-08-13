@@ -14,6 +14,7 @@ import {
 interface UnifiedOverrideControlProps {
   dossierId: string
   onStatusChange?: (newFactureStatus: string, newReglementStatus: string, isManual: boolean) => void
+  onInitialStatus?: (factureStatus: string, reglementStatus: string, isManual: boolean) => void
 }
 
 interface MasterStatus {
@@ -26,7 +27,8 @@ interface MasterStatus {
 
 const UnifiedOverrideControl: React.FC<UnifiedOverrideControlProps> = ({
   dossierId,
-  onStatusChange
+  onStatusChange,
+  onInitialStatus
 }) => {
   const [status, setStatus] = useState<MasterStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -63,6 +65,9 @@ const UnifiedOverrideControl: React.FC<UnifiedOverrideControlProps> = ({
       console.log('✅ Données chargées:', data)
       setStatus(data)
       setSelectedReglementStatus(data.REGLEMENT)
+      
+      // Communiquer le statut initial au composant parent
+      onInitialStatus?.(data.FACTURE, data.REGLEMENT, data.MANUAL_OVERRIDE)
     } catch (err) {
       console.error('❌ Erreur dans loadStatus:', err)
       setError(err instanceof Error ? err.message : 'Erreur inconnue')
