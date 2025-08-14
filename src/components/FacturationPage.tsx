@@ -8,15 +8,17 @@ import { useAuth } from '../contexts/AuthContext'
 
 // Interfaces
 interface FinanceCase {
-  master_id: string
-  dossier: string
-  client_name: string
-  net_payable: number
-  lta: string
-  status: string
-  override_mode: boolean
-  notes: string | null
-  notes_last_updated?: string
+  id: string
+  customer_id: string
+  customer_name: string
+  invoice_number: string
+  amount_total: number
+  amount_paid: number
+  amount_remaining: number
+  status: 'unpaid' | 'partial' | 'paid'
+  due_date: string
+  issued_date: string
+  created_at: string
 }
 
 const FacturationPage: React.FC = () => {
@@ -34,6 +36,10 @@ const FacturationPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
+  
+  // États pour le tri
+  const [sortField, setSortField] = useState<'invoice_number' | 'customer_name' | 'issued_date' | 'due_date' | 'amount_total' | 'status' | 'created_at'>('created_at')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   // Fonction pour charger les données finance
   const loadFinanceCases = async () => {
@@ -41,35 +47,24 @@ const FacturationPage: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      // Test d'abord si la vue existe
-      const { data: testData, error: testError } = await supabase
-        .from('case_finance_summary')
-        .select('*')
-        .limit(1)
+      console.log('Chargement des factures...')
       
-      if (testError) {
-        console.error('Erreur lors du test de case_finance_summary:', testError)
-        setError(`Erreur lors du chargement des données finance: ${testError.message}`)
-        setFinanceCases([])
-        setLoading(false)
-        return
-      }
-      
-      // Si le test passe, récupérer toutes les données
+      // Utiliser la vue invoice_summary qui existe déjà
       const { data, error } = await supabase
-        .from('case_finance_summary')
+        .from('invoice_summary')
         .select('*')
-        .order('date_operation', { ascending: false })
+        .order('created_at', { ascending: false })
       
       if (error) {
-        setError(error.message)
+        console.error('Erreur lors du chargement des factures:', error)
+        setError(`Erreur lors du chargement des factures: ${error.message}`)
         setFinanceCases([])
       } else {
-        console.log('Données finance chargées:', data?.length || 0, 'cases')
+        console.log('Factures chargées:', data?.length || 0, 'factures')
         setFinanceCases(data || [])
       }
     } catch (err) {
-      console.error('Erreur chargement cases finance:', err)
+      console.error('Erreur chargement factures:', err)
       setError('Erreur lors du chargement des données')
       setFinanceCases([])
     } finally {
@@ -77,92 +72,13 @@ const FacturationPage: React.FC = () => {
     }
   }
 
-  // Fonction pour sauvegarder les notes
-  const saveFinanceNotes = async (masterId: string, overrideMode: boolean, notes: string) => {
-    try {
-      setLoadingNotes(prev => new Set(prev).add(masterId))
-      
-      const { data: existing } = await supabase
-        .from('case_finance_notes')
-        .select('id')
-        .eq('master_id', masterId)
-        .single()
-      
-      if (existing) {
-        // Update
-        const { error } = await supabase
-          .from('case_finance_notes')
-          .update({
-            override_mode: overrideMode,
-            notes: notes,
-            updated_by: user?.id
-          })
-          .eq('master_id', masterId)
-        
-        if (error) throw error
-      } else {
-        // Insert
-        const { error } = await supabase
-          .from('case_finance_notes')
-          .insert({
-            master_id: masterId,
-            override_mode: overrideMode,
-            notes: notes,
-            created_by: user?.id,
-            updated_by: user?.id
-          })
-        
-        if (error) throw error
-      }
-      
-      // Recharger les données
-      await loadFinanceCases()
-      
-    } catch (err) {
-      console.error('Erreur sauvegarde notes:', err)
-      alert('Erreur lors de la sauvegarde')
-    } finally {
-      setLoadingNotes(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(masterId)
-        return newSet
-      })
-    }
-  }
-
-  // Handlers avec debounce pour les notes
-  const handleOverrideModeChange = async (masterId: string, overrideMode: boolean) => {
-    const caseData = financeCases.find(c => c.master_id === masterId)
-    await saveFinanceNotes(masterId, overrideMode, caseData?.notes || '')
-  }
-
-  const debouncedSaveNotes = useCallback(
-    (masterId: string, notes: string) => {
-      const caseData = financeCases.find(c => c.master_id === masterId)
-      if (caseData) {
-        saveFinanceNotes(masterId, caseData.override_mode, notes)
-      }
-    },
-    [financeCases]
-  )
-
-  const handleNotesChange = (masterId: string, notes: string) => {
-    // Mise à jour locale immédiate pour l'UI
-    setFinanceCases(prev => prev.map(c => 
-      c.master_id === masterId ? { ...c, notes } : c
-    ))
-    
-    // Sauvegarde avec debounce
-    setTimeout(() => debouncedSaveNotes(masterId, notes), 1000)
-  }
-
   useEffect(() => {
     loadFinanceCases()
   }, [])
 
-  // Fonction de rafraîchissement des données
+  // Handlers simplifiés pour les factures
   const handleRefresh = async () => {
-    console.log('🔄 Rafraîchissement des cases finance...')
+    console.log('🔄 Rafraîchissement des factures...')
     await loadFinanceCases()
   }
 
@@ -189,24 +105,24 @@ const FacturationPage: React.FC = () => {
     }
   }
 
-  // Filtrage des cases finance
-  const filteredFinanceCases = useMemo(() => {
-    return financeCases.filter(financeCase => {
+  // Filtrage et tri des factures
+  const filteredAndSortedFinanceCases = useMemo(() => {
+    let filtered = financeCases.filter(financeCase => {
       // Filtre par recherche
       const searchMatch = !searchTerm || 
-        financeCase.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        financeCase.dossier?.toLowerCase().includes(searchTerm.toLowerCase())
+        financeCase.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        financeCase.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase())
 
       // Filtre par statut
       const statusMatch = !statusFilter || financeCase.status === statusFilter
 
       // Filtre par client
-      const customerMatch = !customerFilter || financeCase.client_name === customerFilter
+      const customerMatch = !customerFilter || financeCase.customer_name === customerFilter
 
       // Filtre par date (si disponible)
       const dateMatch = !dateFilter || (() => {
-        if (!financeCase.notes_last_updated) return true
-        const caseDate = new Date(financeCase.notes_last_updated)
+        if (!financeCase.created_at) return true
+        const caseDate = new Date(financeCase.created_at)
         const today = new Date()
         const yesterday = new Date(today)
         yesterday.setDate(yesterday.getDate() - 1)
@@ -231,27 +147,92 @@ const FacturationPage: React.FC = () => {
 
       return searchMatch && statusMatch && customerMatch && dateMatch
     })
-  }, [financeCases, searchTerm, statusFilter, customerFilter, dateFilter])
+
+    // Tri des factures
+    filtered.sort((a, b) => {
+      let aValue: any = a[sortField]
+      let bValue: any = b[sortField]
+
+      // Gestion des valeurs null/undefined
+      if (aValue === null || aValue === undefined) aValue = ''
+      if (bValue === null || bValue === undefined) bValue = ''
+
+      // Tri spécial pour les dates
+      if (sortField === 'issued_date' || sortField === 'due_date' || sortField === 'created_at') {
+        aValue = new Date(aValue).getTime()
+        bValue = new Date(bValue).getTime()
+      }
+
+      // Tri spécial pour les montants
+      if (sortField === 'amount_total') {
+        aValue = Number(aValue) || 0
+        bValue = Number(bValue) || 0
+      }
+
+      // Tri spécial pour les numéros de facture (tri naturel)
+      if (sortField === 'invoice_number') {
+        aValue = aValue.toString()
+        bValue = bValue.toString()
+      }
+
+      // Tri spécial pour le nom du client
+      if (sortField === 'customer_name') {
+        aValue = aValue.toString().toLowerCase()
+        bValue = bValue.toString().toLowerCase()
+      }
+
+      // Tri spécial pour le statut
+      if (sortField === 'status') {
+        const statusOrder = { 'paid': 3, 'partial': 2, 'unpaid': 1 }
+        aValue = statusOrder[aValue as keyof typeof statusOrder] || 0
+        bValue = statusOrder[bValue as keyof typeof statusOrder] || 0
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0
+      }
+    })
+
+    return filtered
+  }, [financeCases, searchTerm, statusFilter, customerFilter, dateFilter, sortField, sortDirection])
+
+  // Fonction pour changer le tri
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // Fonction pour obtenir l'icône de tri
+  const getSortIcon = (field: typeof sortField) => {
+    if (sortField !== field) return '↕️'
+    return sortDirection === 'asc' ? '↑' : '↓'
+  }
 
   // Options pour les filtres
   const filterOptions = {
     status: {
       label: 'Statut',
       options: [
-        { value: 'pending', label: 'En attente' },
-        { value: 'completed', label: 'Terminé' },
-        { value: 'cancelled', label: 'Annulé' }
+        { value: 'unpaid', label: 'Impayée' },
+        { value: 'partial', label: 'Partielle' },
+        { value: 'paid', label: 'Payée' }
       ],
       value: statusFilter,
       onChange: setStatusFilter
     },
     customer: {
       label: 'Client',
-      options: Array.from(new Set(financeCases.map(fc => fc.client_name)))
+      options: Array.from(new Set(financeCases.map(fc => fc.customer_name)))
         .filter(Boolean)
-        .map(clientName => ({
-          value: clientName,
-          label: clientName
+        .map(customerName => ({
+          value: customerName,
+          label: customerName
         })),
       value: customerFilter,
       onChange: setCustomerFilter
@@ -276,7 +257,7 @@ const FacturationPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Facturation</h2>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Gestion des dossiers finance avec système de notes override
+            Gestion des factures et suivi des paiements
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -332,7 +313,7 @@ const FacturationPage: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400">Chargement des cases finance...</p>
             </div>
           </div>
-        ) : filteredFinanceCases.length === 0 ? (
+        ) : filteredAndSortedFinanceCases.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <FileText className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
@@ -341,103 +322,125 @@ const FacturationPage: React.FC = () => {
               </h3>
               <p className="text-gray-600 dark:text-gray-400">
                 {financeCases.length === 0 
-                  ? 'Aucun dossier trouvé dans la vue case_finance_summary'
-                  : 'Aucun dossier ne correspond aux critères de recherche et de filtres'
+                  ? 'Aucune facture trouvée'
+                  : 'Aucune facture ne correspond aux critères de recherche et de filtres'
                 }
               </p>
             </div>
           </div>
         ) : (
-          filteredFinanceCases.map((financeCase) => (
-            <div 
-              key={financeCase.master_id}
-              className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-sm"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Dossier {financeCase.dossier}
-                  </h3>
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm">
-                    {financeCase.client_name}
-                  </span>
+          <div className="overflow-x-auto">
+            {/* En-têtes de colonnes avec tri */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-t-lg border border-gray-200 dark:border-gray-600">
+              <div className="grid grid-cols-12 gap-4 p-4 font-medium text-gray-700 dark:text-gray-300 text-sm">
+                <div className="col-span-2">
+                  <button
+                    onClick={() => handleSort('invoice_number')}
+                    className="flex items-center space-x-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span>N° Facture</span>
+                    <span className="text-xs">{getSortIcon('invoice_number')}</span>
+                  </button>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {financeCase.net_payable ? `${financeCase.net_payable.toLocaleString('fr-FR')} €` : '-'}
-                  </span>
-                  
-                  {/* Toggle Override Mode */}
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Override manuel</span>
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={financeCase.override_mode || false}
-                        onChange={(e) => handleOverrideModeChange(financeCase.master_id, e.target.checked)}
-                        disabled={loadingNotes.has(financeCase.master_id)}
-                        className="sr-only"
-                      />
-                      <div className={`w-11 h-6 rounded-full transition-colors ${
-                        financeCase.override_mode 
-                          ? 'bg-blue-600' 
-                          : 'bg-gray-300 dark:bg-gray-600'
-                      }`}>
-                        <div className={`w-4 h-4 bg-white rounded-full transition-transform translate-y-1 ${
-                          financeCase.override_mode ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                      </div>
-                    </div>
-                  </label>
+                <div className="col-span-3">
+                  <button
+                    onClick={() => handleSort('customer_name')}
+                    className="flex items-center space-x-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span>Client</span>
+                  </button>
                 </div>
-              </div>
-              
-              {/* Notes Field - Apparaît seulement en mode override */}
-              {financeCase.override_mode && (
-                <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Notes (mode override manuel)
-                  </label>
-                  <textarea
-                    value={financeCase.notes || ''}
-                    onChange={(e) => handleNotesChange(financeCase.master_id, e.target.value)}
-                    disabled={loadingNotes.has(financeCase.master_id)}
-                    placeholder="Ajoutez vos notes pour ce dossier..."
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    rows={3}
-                  />
-                  {loadingNotes.has(financeCase.master_id) && (
-                    <div className="mt-2 flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                      <span>Sauvegarde...</span>
-                    </div>
-                  )}
+                <div className="col-span-2">
+                  <button
+                    onClick={() => handleSort('amount_total')}
+                    className="flex items-center space-x-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span>Montant</span>
+                    <span className="text-xs">{getSortIcon('amount_total')}</span>
+                  </button>
                 </div>
-              )}
-              
-              {/* Infos supplémentaires */}
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">LTA:</span>
-                  <span className="ml-2 font-mono text-gray-900 dark:text-white">{financeCase.lta || '-'}</span>
+                <div className="col-span-1">
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center space-x-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span>Statut</span>
+                  </button>
                 </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Statut:</span>
-                  <span className="ml-2 text-gray-900 dark:text-white">{financeCase.status || '-'}</span>
+                <div className="col-span-2">
+                  <button
+                    onClick={() => handleSort('issued_date')}
+                    className="flex items-center space-x-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span>Date émission</span>
+                    <span className="text-xs">{getSortIcon('issued_date')}</span>
+                  </button>
                 </div>
-                {financeCase.notes_last_updated && (
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Dernière note:</span>
-                    <span className="ml-2 text-gray-900 dark:text-white">
-                      {new Date(financeCase.notes_last_updated).toLocaleDateString('fr-FR')}
-                    </span>
-                  </div>
-                )}
+                <div className="col-span-2">
+                  <button
+                    onClick={() => handleSort('due_date')}
+                    className="flex items-center space-x-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span>Échéance</span>
+                    <span className="text-xs">{getSortIcon('due_date')}</span>
+                  </button>
+                </div>
               </div>
             </div>
-          ))
+
+            {/* Lignes des factures */}
+            <div className="border border-gray-200 dark:border-gray-600 rounded-b-lg">
+              {filteredAndSortedFinanceCases.map((financeCase, index) => (
+                <div 
+                  key={financeCase.id}
+                  className={`grid grid-cols-12 gap-4 p-4 text-sm border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
+                    index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700'
+                  }`}
+                >
+                  {/* N° Facture */}
+                  <div className="col-span-2 font-medium text-gray-900 dark:text-white">
+                    {financeCase.invoice_number || '-'}
+                  </div>
+                  
+                  {/* Client */}
+                  <div className="col-span-3">
+                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs">
+                      {financeCase.customer_name || '-'}
+                    </span>
+                  </div>
+                  
+                  {/* Montant */}
+                  <div className="col-span-2 font-medium text-gray-900 dark:text-white">
+                    {financeCase.amount_total ? `${financeCase.amount_total.toLocaleString('fr-FR')} €` : '-'}
+                  </div>
+                  
+                  {/* Statut */}
+                  <div className="col-span-1">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      financeCase.status === 'paid' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        : financeCase.status === 'partial'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      {financeCase.status === 'paid' ? 'Payée' : 
+                       financeCase.status === 'partial' ? 'Partielle' : 'Impayée'}
+                    </span>
+                  </div>
+                  
+                  {/* Date d'émission */}
+                  <div className="col-span-2 text-gray-600 dark:text-gray-400">
+                    {financeCase.issued_date ? new Date(financeCase.issued_date).toLocaleDateString('fr-FR') : '-'}
+                  </div>
+                  
+                  {/* Échéance */}
+                  <div className="col-span-2 text-gray-600 dark:text-gray-400">
+                    {financeCase.due_date ? new Date(financeCase.due_date).toLocaleDateString('fr-FR') : '-'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Card, CardContent, CardHeader } from './ui/Card'
+import { useAuth } from '../contexts/AuthContext'
+import { Card, CardHeader, CardContent } from './ui/Card'
 import { Plus, Edit, Trash2, Save, X, FileText } from 'lucide-react'
 
 interface FinanceNote {
@@ -14,10 +15,11 @@ interface FinanceNote {
 }
 
 interface FinanceNotesCardProps {
-  dossierId: string
+  masterId: string
+  dossierNumber: string
 }
 
-const FinanceNotesCard: React.FC<FinanceNotesCardProps> = ({ dossierId }) => {
+const FinanceNotesCard: React.FC<FinanceNotesCardProps> = ({ masterId, dossierNumber }) => {
   const [notes, setNotes] = useState<FinanceNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -27,31 +29,37 @@ const FinanceNotesCard: React.FC<FinanceNotesCardProps> = ({ dossierId }) => {
   const [editingNoteText, setEditingNoteText] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Charger les notes existantes
-  const loadNotes = async () => {
-    try {
-      setLoading(true)
-      setError(null)
+     // Charger les notes existantes
+   const loadNotes = async () => {
+     try {
+       setLoading(true)
+       setError(null)
+       
+       console.log('🔍 Chargement des notes pour le dossier:', dossierNumber)
+       console.log('🔍 masterId reçu:', masterId)
 
-      const { data, error: fetchError } = await supabase
-        .from('case_finance_notes')
-        .select('*')
-        .eq('master_dossier', dossierId)
-        .order('created_at', { ascending: false })
+              const { data, error: fetchError } = await supabase
+          .from('case_finance_notes')
+          .select('*')
+          .eq('master_dossier', dossierNumber)
+          .order('created_at', { ascending: false })
 
-      if (fetchError) {
-        console.error('Erreur lors du chargement des notes:', fetchError)
-        throw new Error(`Erreur lors du chargement: ${fetchError.message}`)
-      }
+       console.log('📊 Résultat de la requête:', { data, error: fetchError })
 
-      setNotes(data || [])
-    } catch (err) {
-      console.error('Erreur dans loadNotes:', err)
-      setError(err instanceof Error ? err.message : 'Erreur inconnue')
-    } finally {
-      setLoading(false)
-    }
-  }
+       if (fetchError) {
+         console.error('Erreur lors du chargement des notes:', fetchError)
+         throw new Error(`Erreur lors du chargement: ${fetchError.message}`)
+       }
+
+       setNotes(data || [])
+       console.log('✅ Notes chargées:', data)
+     } catch (err) {
+       console.error('Erreur dans loadNotes:', err)
+       setError(err instanceof Error ? err.message : 'Erreur inconnue')
+     } finally {
+       setLoading(false)
+     }
+   }
 
   // Créer une nouvelle note
   const createNote = async () => {
@@ -61,14 +69,14 @@ const FinanceNotesCard: React.FC<FinanceNotesCardProps> = ({ dossierId }) => {
       setSubmitting(true)
       setError(null)
 
-      const { data, error: insertError } = await supabase
-        .from('case_finance_notes')
-        .insert({
-          master_dossier: dossierId,
-          notes: newNoteText.trim()
-        })
-        .select()
-        .single()
+               const { data, error: insertError } = await supabase
+           .from('case_finance_notes')
+           .insert({
+             master_dossier: dossierNumber,
+             notes: newNoteText.trim()
+           })
+           .select()
+           .single()
 
       if (insertError) {
         console.error('Erreur lors de la création de la note:', insertError)
@@ -178,12 +186,12 @@ const FinanceNotesCard: React.FC<FinanceNotesCardProps> = ({ dossierId }) => {
     })
   }
 
-  // Charger les notes au montage
-  useEffect(() => {
-    if (dossierId) {
-      loadNotes()
-    }
-  }, [dossierId])
+     // Charger les notes au montage
+   useEffect(() => {
+     if (dossierNumber) {
+       loadNotes()
+     }
+   }, [dossierNumber])
 
   if (loading) {
     return (
@@ -207,7 +215,7 @@ const FinanceNotesCard: React.FC<FinanceNotesCardProps> = ({ dossierId }) => {
         actions={
           <button 
             onClick={() => setIsAddingNote(true)}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
           >
             <Plus className="w-4 h-4 inline mr-1" />
             Nouvelle note

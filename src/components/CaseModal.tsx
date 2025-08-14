@@ -1648,7 +1648,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
         {/* Card 4: Règlements ou Notes selon le mode */}
         {isManualMode ? (
           // Mode manuel : Affichage de la carte Notes
-          <FinanceNotesCard dossierId={dossier} />
+          <FinanceNotesCard masterId={caseData?.id || ''} dossierNumber={dossier} />
         ) : (
           // Mode automatique : Affichage de la carte Règlements
           <Card>

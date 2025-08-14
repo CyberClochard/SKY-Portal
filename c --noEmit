@@ -1,0 +1,6 @@
+warning: in the working copy of 'src/components/ManualAllocationModal.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/types/payments.ts', LF will be replaced by CRLF the next time Git touches it
+src/components/FacturationPage.tsx
+src/components/ManualAllocationModal.tsx
+src/hooks/useUnpaidInvoices.ts
+src/types/payments.ts

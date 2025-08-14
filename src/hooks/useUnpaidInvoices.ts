@@ -29,7 +29,8 @@ export const useUnpaidInvoices = (options: UseUnpaidInvoicesOptions = {}) => {
           amount_paid,
           status,
           due_date,
-          created_at
+          created_at,
+          master_id
         `)
         .in('status', options.includePartial ? ['unpaid', 'partial'] : ['unpaid'])
         .order('due_date', { ascending: true })
@@ -47,6 +48,46 @@ export const useUnpaidInvoices = (options: UseUnpaidInvoicesOptions = {}) => {
 
       console.log('Factures récupérées:', data?.length || 0)
       
+      // Si nous avons des factures avec master_id, récupérer les informations des dossiers
+      if (data && data.length > 0) {
+        const masterIds = data
+          .filter(invoice => invoice.master_id)
+          .map(invoice => invoice.master_id)
+        
+        let masterData: any[] = []
+        
+        if (masterIds.length > 0) {
+          const { data: masterInfo, error: masterError } = await supabase
+            .from('MASTER')
+            .select('DOSSIER, CLIENT, TYPE, NOM, DEPART, ARRIVEE')
+            .in('DOSSIER', masterIds)
+          
+          if (masterError) {
+            console.warn('Erreur lors de la récupération des informations des dossiers:', masterError)
+          } else {
+            masterData = masterInfo || []
+          }
+        }
+        
+        // Enrichir les factures avec les informations des dossiers
+        const enrichedData = data.map(invoice => {
+          const masterInfo = masterData.find(master => master.DOSSIER === invoice.master_id)
+          return {
+            ...invoice,
+            dossier_number: masterInfo?.DOSSIER || null,
+            dossier_client: masterInfo?.CLIENT || null,
+            dossier_type: masterInfo?.TYPE || null,
+            hum_name: masterInfo?.NOM || null,
+            depart: masterInfo?.DEPART || null,
+            arrivee: masterInfo?.ARRIVEE || null
+          }
+        })
+        
+        setInvoices(enrichedData)
+      } else {
+        setInvoices(data || [])
+      }
+      
       // Log détaillé des données pour diagnostiquer les problèmes de dates
       if (data && data.length > 0) {
         console.log('=== DIAGNOSTIC DES DONNÉES DE FACTURES ===')
@@ -54,6 +95,7 @@ export const useUnpaidInvoices = (options: UseUnpaidInvoicesOptions = {}) => {
           console.log(`Facture ${index + 1}:`, {
             id: invoice.id,
             invoice_number: invoice.invoice_number,
+            master_id: invoice.master_id,
             due_date: {
               value: invoice.due_date,
               type: typeof invoice.due_date,
@@ -76,7 +118,6 @@ export const useUnpaidInvoices = (options: UseUnpaidInvoicesOptions = {}) => {
         console.log('=== FIN DIAGNOSTIC ===')
       }
       
-      setInvoices(data || [])
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des factures impayées'
       console.error('Erreur dans useUnpaidInvoices:', errorMessage)

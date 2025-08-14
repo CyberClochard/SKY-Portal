@@ -249,18 +249,46 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                 .map((invoice) => (
                 <div key={invoice.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white">
-                        {invoice.invoice_number}
-                      </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h4 className="font-medium text-gray-900 dark:text-white">
+                          Facture {invoice.invoice_number}
+                        </h4>
+                        {invoice.dossier_number && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                            Dossier {invoice.dossier_number}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Informations du dossier et de l'HUM */}
+                      {(invoice.dossier_client || invoice.hum_name || invoice.depart || invoice.arrivee) && (
+                        <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                          {invoice.dossier_client && (
+                            <p><span className="font-medium">Client:</span> {invoice.dossier_client}</p>
+                          )}
+                          {invoice.hum_name && (
+                            <p><span className="font-medium">Défunt:</span> {invoice.hum_name}</p>
+                          )}
+                          {(invoice.depart || invoice.arrivee) && (
+                            <p>
+                              <span className="font-medium">Route:</span> 
+                              {invoice.depart && ` ${invoice.depart}`}
+                              {invoice.depart && invoice.arrivee && ' → '}
+                              {invoice.arrivee && `${invoice.arrivee}`}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                         Échéance : {formatDate(invoice.due_date)}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right ml-4">
                       <p className="text-sm text-gray-600 dark:text-gray-400">Montant restant</p>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {formatCurrency(invoice.amount_remaining || (invoice.amount_total - invoice.amount_paid))}
+                        {formatCurrency(invoice.amount_total - invoice.amount_paid)}
                       </p>
                     </div>
                   </div>
@@ -275,7 +303,7 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          max={invoice.amount_remaining || (invoice.amount_total - invoice.amount_paid)}
+                          max={invoice.amount_total - invoice.amount_paid}
                           value={allocations[invoice.id] || 0}
                           onChange={(e) => handleAllocationChange(invoice.id, parseFloat(e.target.value) || 0)}
                           className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
@@ -287,7 +315,7 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
                     </div>
                     
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <p>Max: {formatCurrency(invoice.amount_remaining || (invoice.amount_total - invoice.amount_paid))}</p>
+                      <p>Max: {formatCurrency(invoice.amount_total - invoice.amount_paid)}</p>
                     </div>
                   </div>
                 </div>

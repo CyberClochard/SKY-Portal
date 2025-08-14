@@ -69,6 +69,13 @@ export interface InvoiceSummary {
   due_date: string
   issued_date: string
   created_at: string
+  master_id?: string
+  dossier_number?: string
+  dossier_client?: string
+  dossier_type?: string
+  hum_name?: string
+  depart?: string
+  arrivee?: string
 }
 
 export interface PaymentAllocationDetails {
