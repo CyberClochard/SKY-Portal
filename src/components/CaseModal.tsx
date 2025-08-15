@@ -4,6 +4,7 @@ import { formatDate } from '../utils/dateUtils'
 import { supabase } from '../lib/supabase'
 import UnifiedOverrideControl from './UnifiedOverrideControl'
 import FinanceNotesCard from './FinanceNotesCard'
+import { InvoiceLinesManager } from './InvoiceLinesManager'
 
 
 // Types pour les templates
@@ -1464,84 +1465,17 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
         />
         
         {/* Card 1: Ventes (pleine largeur) */}
+                {/* Card 1: Ventes (pleine largeur) - Gestion des lignes de facturation */}
         <Card>
-          <CardHeader icon={<Euro className="w-5 h-5" />} title="Ventes" />
+          <CardHeader icon={<Euro className="w-5 h-5" />} title="Ventes - Lignes de facturation" />
           <CardContent>
-            {/* Résumé financier */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(ventesData.lignes.reduce((sum, ligne) => sum + ligne.montantHT, 0))}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Montant HT</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(ventesData.montantTVA)}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">TVA (total)</div>
-              </div>
-              <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                <div className="text-2xl font-bold text-blue-900 dark:text-blue-300">
-                  {formatCurrency(ventesData.montantTTC)}
-                </div>
-                <div className="text-sm text-blue-600 dark:text-blue-400">Montant TTC</div>
-              </div>
-            </div>
-
-            {/* Lignes de vente */}
-            <div className="space-y-4 mb-6">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-gray-900 dark:text-white">Lignes de vente</h4>
-                <button 
-                  onClick={addLigneVente}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                >
-                  + Ajouter une ligne
-                </button>
-              </div>
-              
-              {ventesData.lignes.map((ligne, index) => (
-                <LigneVenteComponent
-                  key={ligne.id}
-                  ligne={ligne}
-                  index={index}
-                  onUpdate={updateLigneVente}
-                  onDelete={deleteLigneVente}
-                  formatCurrency={formatCurrency}
-                />
-              ))}
-              
-              {ventesData.lignes.length === 0 && (
-                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                  Aucune ligne de vente
-                  <button 
-                    onClick={addLigneVente}
-                    className="block mx-auto mt-2 text-blue-600 hover:text-blue-800"
-                  >
-                    + Ajouter la première ligne
-                  </button>
-                </div>
-              )}
-            </div>
-
-
-
-            {/* Statut et actions */}
-            <div className="mt-6 flex items-center justify-between">
-              <StatutBadge statut={ventesData.statutFacturation} />
-              <div className="flex space-x-3">
-                <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
-                  📋 Générer Devis
-                </button>
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-                  📄 Générer Facture
-                </button>
-                <button className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
-                  ✏️ Modifier Prix
-                </button>
-              </div>
-            </div>
+            <InvoiceLinesManager 
+              dossierNumber={dossier}
+              onUpdate={() => {
+                // Rafraîchir les données si nécessaire
+                console.log('Lignes de facturation mises à jour')
+              }}
+            />
           </CardContent>
         </Card>
 
