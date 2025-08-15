@@ -27,12 +27,18 @@ const ManualAllocationModal: React.FC<ManualAllocationModalProps> = ({
     paymentId: payment?.id || ''
   })
 
-  // Initialiser le montant restant
+  // Vérifier que le paiement peut être alloué
   useEffect(() => {
+    if (payment && payment.status === 'completed') {
+      setError('Ce paiement est déjà entièrement alloué')
+      setTimeout(() => onClose(), 2000) // Fermer automatiquement après 2 secondes
+      return
+    }
+    
     if (payment) {
       setRemainingAmount(payment.amount)
     }
-  }, [payment])
+  }, [payment, onClose])
 
   // Désactiver la molette de souris sur les champs numériques
   useEffect(() => {

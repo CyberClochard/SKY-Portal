@@ -85,10 +85,10 @@ export const usePaymentAllocations = (options: UsePaymentAllocationsOptions) => 
 
       if (error) throw error
 
-      // Mettre à jour le statut auto_allocate du paiement
+      // Mettre à jour le statut du paiement à 'completed' (allocation terminée)
       const { error: updateError } = await supabase
         .from('payments')
-        .update({ auto_allocate: true })
+        .update({ status: 'completed' })
         .eq('id', allocationData.payment_id)
 
       if (updateError) throw updateError
@@ -135,10 +135,10 @@ export const usePaymentAllocations = (options: UsePaymentAllocationsOptions) => 
 
       if (error) throw error
 
-      // Mettre à jour le statut auto_allocate du paiement
+      // Mettre à jour le statut du paiement à 'completed' (allocation terminée)
       const { error: updateError } = await supabase
         .from('payments')
-        .update({ auto_allocate: true })
+        .update({ status: 'completed' })
         .eq('id', paymentId)
 
       if (updateError) throw updateError

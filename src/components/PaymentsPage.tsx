@@ -28,8 +28,8 @@ const PaymentsPage: React.FC = () => {
   const handlePaymentSuccess = (payment: PaymentWithCustomer) => {
     setShowPaymentForm(false)
     
-    // Si le paiement n'a pas d'allocation automatique, ouvrir le modal d'allocation manuelle
-    if (!payment.auto_allocate) {
+    // Si le paiement n'est pas encore alloué (status !== 'completed'), ouvrir le modal d'allocation manuelle
+    if (payment.status !== 'completed') {
       setSelectedPayment(payment)
       setShowAllocationModal(true)
     }
@@ -129,8 +129,8 @@ const PaymentsPage: React.FC = () => {
 
       // Filtre par allocation
       const allocationMatch = !allocationFilter || 
-        (allocationFilter === 'allocated' && payment.auto_allocate) ||
-        (allocationFilter === 'unallocated' && !payment.auto_allocate)
+        (allocationFilter === 'allocated' && payment.status === 'completed') ||
+        (allocationFilter === 'unallocated' && payment.status !== 'completed')
 
       // Filtre par date
       const dateMatch = !dateFilter || (() => {
@@ -220,7 +220,7 @@ const PaymentsPage: React.FC = () => {
          return (
            <div className="flex items-center space-x-2">
              {getStatusBadge(payment.status)}
-             {!payment.auto_allocate && (
+             {payment.status !== 'completed' && (
                <span className="px-2 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300 rounded-full text-xs font-medium">
                  Non alloué
                </span>
@@ -257,7 +257,7 @@ const PaymentsPage: React.FC = () => {
              >
                <Eye className="w-4 h-4" />
              </button>
-             {!payment.auto_allocate && (
+             {payment.status !== 'completed' && (
                <button
                  onClick={() => {
                    setSelectedPayment(payment)
@@ -307,10 +307,10 @@ const PaymentsPage: React.FC = () => {
       onChange: setMethodFilter
     },
     allocation: {
-      label: 'Allocation',
+      label: 'État d\'allocation',
       options: [
-        { value: 'allocated', label: 'Alloués' },
-        { value: 'unallocated', label: 'Non alloués' }
+        { value: 'allocated', label: 'Allocation terminée' },
+        { value: 'unallocated', label: 'Allocation en cours' }
       ],
       value: allocationFilter,
       onChange: setAllocationFilter
