@@ -1,277 +1,290 @@
 import React, { useState } from 'react'
-import { Plus, Edit, Trash2, GripVertical } from 'lucide-react'
-import { useInvoiceLines, InvoiceLineFormData } from '../hooks/useInvoiceLines'
+import { Plus, Edit, Trash2, Save, X } from 'lucide-react'
+import { useInvoiceLines, InvoiceLine } from '../hooks/useInvoiceLines'
 
 interface InvoiceLinesManagerProps {
-  dossierNumber: string
+  masterId: string
   onUpdate?: () => void
 }
 
 export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
-  dossierNumber,
+  masterId,
   onUpdate
 }) => {
   const {
     invoiceLines,
-    invoiceHeader,
     loading,
     error,
-    totals,
     createInvoiceLine,
     updateInvoiceLine,
-    deleteInvoiceLine,
-    reorderInvoiceLines,
-    upsertInvoiceHeader
-  } = useInvoiceLines({ dossierNumber })
+    deleteInvoiceLine
+  } = useInvoiceLines({ masterId })
 
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [editingLine, setEditingLine] = useState<string | null>(null)
-  const [formData, setFormData] = useState<InvoiceLineFormData>({
-    designation: '',
-    quantite: 1,
-    prix_unitaire: 0,
-    taux_tva: 20,
-    notes: ''
+  const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [newLine, setNewLine] = useState({
+    description: '',
+    quantity: 1,
+    unit_price: 0
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (editingLine) {
-      const success = await updateInvoiceLine(editingLine, formData)
-      if (success) {
-        setEditingLine(null)
-        setFormData({ designation: '', quantite: 1, prix_unitaire: 0, taux_tva: 20, notes: '' })
-        onUpdate?.()
-      }
-    } else {
-      const newLine = await createInvoiceLine(formData)
-      if (newLine) {
-        setShowAddForm(false)
-        setFormData({ designation: '', quantite: 1, prix_unitaire: 0, taux_tva: 20, notes: '' })
-        onUpdate?.()
-      }
-    }
-  }
+  const handleAddLine = async () => {
+    if (!newLine.description.trim()) return
 
-  const handleEdit = (line: any) => {
-    setEditingLine(line.id)
-    setFormData({
-      designation: line.designation,
-      quantite: line.quantite,
-      prix_unitaire: line.prix_unitaire,
-      taux_tva: line.taux_tva,
-      notes: line.notes || ''
+    const success = await createInvoiceLine({
+      master_id: masterId,
+      description: newLine.description.trim(),
+      quantity: newLine.quantity,
+      unit_price: newLine.unit_price
     })
+
+    if (success) {
+      setNewLine({ description: '', quantity: 1, unit_price: 0 })
+      setIsAdding(false)
+      onUpdate?.()
+    }
   }
 
-  const handleDelete = async (lineId: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette ligne ?')) {
-      const success = await deleteInvoiceLine(lineId)
+  const handleUpdateLine = async (id: string, updates: Partial<InvoiceLine>) => {
+    const success = await updateInvoiceLine(id, updates)
+    if (success) {
+      setEditingId(null)
+      onUpdate?.()
+    }
+  }
+
+  const handleDeleteLine = async (id: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette ligne ?')) {
+      const success = await deleteInvoiceLine(id)
       if (success) {
         onUpdate?.()
       }
     }
   }
 
-  const handleCancel = () => {
-    setShowAddForm(false)
-    setEditingLine(null)
-    setFormData({ designation: '', quantite: 1, prix_unitaire: 0, taux_tva: 20, notes: '' })
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(amount)
   }
 
   if (loading) {
-    return <div className="text-center py-4">Chargement des lignes de facturation...</div>
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600">Chargement...</span>
+      </div>
+    )
   }
 
   if (error) {
-    return <div className="text-red-600 text-center py-4">Erreur: {error}</div>
+    return (
+      <div className="text-center py-8 text-red-600">
+        <p className="font-medium">Erreur lors du chargement des lignes de facturation</p>
+        <p className="text-sm mt-1">{error}</p>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4">
-      {/* En-tête avec totaux */}
-      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Total HT</div>
-            <div className="text-lg font-semibold">{totals.totalHT.toFixed(2)} €</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Total TVA</div>
-            <div className="text-lg font-semibold">{totals.totalTVA.toFixed(2)} €</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Total TTC</div>
-            <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-              {totals.totalTTC.toFixed(2)} €
-            </div>
-          </div>
-        </div>
+      {/* Bouton Ajouter */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          Lignes de facturation ({invoiceLines.length})
+        </h3>
+        {!isAdding && (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ajouter</span>
+          </button>
+        )}
       </div>
 
-      {/* Bouton d'ajout */}
-      {!showAddForm && !editingLine && (
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Ajouter une ligne
-        </button>
-      )}
-
-      {/* Formulaire d'ajout/modification */}
-      {(showAddForm || editingLine) && (
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Formulaire d'ajout */}
+      {isAdding && (
+        <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Désignation *
+                Description *
               </label>
               <input
                 type="text"
-                value={formData.designation}
-                onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                required
+                value={newLine.description}
+                onChange={(e) => setNewLine(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Description du produit/service"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                autoFocus
               />
             </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Quantité *
+                Quantité
               </label>
               <input
                 type="number"
-                step="0.01"
-                min="0.01"
-                value={formData.quantite}
-                onChange={(e) => setFormData({ ...formData, quantite: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                required
+                value={newLine.quantity}
+                onChange={(e) => setNewLine(prev => ({ ...prev, quantity: Number(e.target.value) || 1 }))}
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prix unitaire HT *
+                Prix unitaire
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.prix_unitaire}
-                onChange={(e) => setFormData({ ...formData, prix_unitaire: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="number"
+                  value={newLine.unit_price}
+                  onChange={(e) => setNewLine(prev => ({ ...prev, unit_price: Number(e.target.value) || 0 }))}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="absolute right-3 top-2 text-sm text-gray-500">€</span>
+              </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Taux TVA (%) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                value={formData.taux_tva}
-                onChange={(e) => setFormData({ ...formData, taux_tva: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                required
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Notes
-              </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              />
+            <div className="flex space-x-2">
+              <button
+                onClick={handleAddLine}
+                disabled={!newLine.description.trim()}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+              >
+                <Save className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setIsAdding(false)
+                  setNewLine({ description: '', quantity: 1, unit_price: 0 })
+                }}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-
-          <div className="flex gap-2 mt-4">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {editingLine ? 'Modifier' : 'Ajouter'}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-            >
-              Annuler
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Liste des lignes */}
-      {invoiceLines.length > 0 && (
-        <div className="space-y-2">
-          {invoiceLines.map((line, index) => (
-            <div
-              key={line.id}
-              className="bg-white dark:bg-gray-800 p-4 rounded-lg border flex items-center gap-3"
-            >
-              <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
-              
-              <div className="flex-1">
-                <div className="font-medium">{line.designation}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {line.quantite} × {line.prix_unitaire.toFixed(2)} € HT
-                  {line.notes && ` • ${line.notes}`}
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="font-medium">{line.montant_ttc.toFixed(2)} € TTC</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {line.montant_ht.toFixed(2)} € HT + {line.montant_tva.toFixed(2)} € TVA ({line.taux_tva}%)
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEdit(line)}
-                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                  title="Modifier"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(line.id)}
-                  className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                  title="Supprimer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
-      {/* Message si aucune ligne */}
-      {invoiceLines.length === 0 && !showAddForm && !editingLine && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          Aucune ligne de facturation pour ce dossier.
-          <br />
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="text-blue-600 hover:text-blue-800 underline mt-2"
-          >
-            Ajouter la première ligne
-          </button>
+      {/* Tableau des lignes */}
+      {invoiceLines.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border border-gray-200 dark:border-gray-600 rounded-lg">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Quantité
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Prix unitaire
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Total
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+              {invoiceLines.map((line) => (
+                <tr key={line.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-4 py-3">
+                    {editingId === line.id ? (
+                      <input
+                        type="text"
+                        defaultValue={line.description}
+                        onBlur={(e) => handleUpdateLine(line.id, { description: e.target.value })}
+                        onKeyPress={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    ) : (
+                      <span className="text-gray-900 dark:text-white">{line.description}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === line.id ? (
+                      <input
+                        type="number"
+                        defaultValue={line.quantity}
+                        onBlur={(e) => handleUpdateLine(line.id, { quantity: Number(e.target.value) || 1 })}
+                        onKeyPress={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        min="1"
+                        className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    ) : (
+                      <span className="text-gray-900 dark:text-white">{line.quantity}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === line.id ? (
+                      <div className="relative">
+                        <input
+                          type="number"
+                          defaultValue={line.unit_price}
+                          onBlur={(e) => handleUpdateLine(line.id, { unit_price: Number(e.target.value) || 0 })}
+                          onKeyPress={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                          step="0.01"
+                          min="0"
+                          className="w-24 px-2 py-1 pr-6 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                        <span className="absolute right-2 top-1 text-xs text-gray-500">€</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-900 dark:text-white">{formatCurrency(line.unit_price)}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(line.total_price)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex space-x-2">
+                      {editingId === line.id ? (
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="text-green-600 hover:text-green-800"
+                          title="Sauvegarder"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setEditingId(line.id)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Modifier"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteLine(line.id)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          <p>Aucune ligne de facturation</p>
+          <p className="text-sm mt-1">Cliquez sur "Ajouter" pour créer la première ligne</p>
         </div>
       )}
     </div>

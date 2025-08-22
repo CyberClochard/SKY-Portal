@@ -275,7 +275,7 @@ const FacturationPage: React.FC = () => {
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>Nouvelle facture</span>
+            <span>Import SAGE</span>
           </button>
         </div>
       </div>

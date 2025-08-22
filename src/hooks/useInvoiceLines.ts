@@ -1,62 +1,31 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Types pour les lignes de facturation
 export interface InvoiceLine {
   id: string
-  dossier_number: string
-  designation: string
-  quantite: number
-  prix_unitaire: number
-  taux_tva: number
-  montant_ht: number
-  montant_tva: number
-  montant_ttc: number
-  ordre: number
-  notes?: string
-  created_at: string
-  updated_at: string
+  invoice_id?: string // lecture uniquement
+  master_id: string
+  description: string
+  quantity: number
+  unit_price: number
+  total_price: number // remplissage auto (quantity * unit_price)
+  created_at?: string
+  updated_at?: string
 }
 
-export interface InvoiceHeader {
-  id: string
-  dossier_number: string
-  statut_facturation: 'devis' | 'facture_envoyee' | 'payee'
-  date_devis?: string
-  date_facture?: string
-  numero_facture?: string
-  client_name?: string
-  client_email?: string
-  client_phone?: string
-  client_address?: string
-  conditions_paiement?: string
-  echeance_paiement?: string
-  created_at: string
-  updated_at: string
+interface UseInvoiceLinesOptions {
+  masterId: string
 }
 
-export interface InvoiceLineFormData {
-  designation: string
-  quantite: number
-  prix_unitaire: number
-  taux_tva: number
-  notes?: string
-}
-
-export interface UseInvoiceLinesOptions {
-  dossierNumber?: string
-  limit?: number
-}
-
-export const useInvoiceLines = (options: UseInvoiceLinesOptions = {}) => {
+export const useInvoiceLines = (options: UseInvoiceLinesOptions) => {
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([])
-  const [invoiceHeader, setInvoiceHeader] = useState<InvoiceHeader | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // Récupérer les lignes de facturation pour un dossier
   const fetchInvoiceLines = useCallback(async () => {
-    if (!options.dossierNumber) {
+    if (!options.masterId) {
+      console.log('🔍 useInvoiceLines: Pas de masterId fourni')
       setInvoiceLines([])
       setLoading(false)
       return
@@ -65,207 +34,153 @@ export const useInvoiceLines = (options: UseInvoiceLinesOptions = {}) => {
     try {
       setLoading(true)
       setError(null)
+      console.log('🔍 useInvoiceLines: Début du chargement pour le dossier:', options.masterId)
 
-      // Récupérer les lignes de facturation
       const { data: linesData, error: linesError } = await supabase
         .from('invoice_lines')
         .select('*')
-        .eq('dossier_number', options.dossierNumber)
-        .order('ordre', { ascending: true })
+        .eq('master_id', options.masterId)
 
-      if (linesError) throw linesError
-
-      // Récupérer l'en-tête de facturation
-      const { data: headerData, error: headerError } = await supabase
-        .from('invoice_headers')
-        .select('*')
-        .eq('dossier_number', options.dossierNumber)
-        .single()
-
-      if (headerError && headerError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.warn('Erreur lors de la récupération de l\'en-tête:', headerError)
+      if (linesError) {
+        console.error('❌ useInvoiceLines: Erreur lors de la requête:', linesError)
+        throw linesError
       }
 
+      console.log('✅ useInvoiceLines: Données récupérées avec succès:', linesData?.length || 0, 'lignes')
       setInvoiceLines(linesData || [])
-      setInvoiceHeader(headerData || null)
     } catch (err) {
+      console.error('❌ useInvoiceLines: Erreur générale:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des lignes de facturation'
-      console.error('Erreur dans useInvoiceLines:', errorMessage)
       setError(errorMessage)
       setInvoiceLines([])
-      setInvoiceHeader(null)
     } finally {
       setLoading(false)
     }
-  }, [options.dossierNumber])
+  }, [options.masterId])
 
-  // Créer une nouvelle ligne de facturation
-  const createInvoiceLine = useCallback(async (lineData: InvoiceLineFormData): Promise<InvoiceLine | null> => {
-    if (!options.dossierNumber) {
-      setError('Numéro de dossier requis')
-      return null
-    }
-
+  // Créer une nouvelle ligne
+  const createInvoiceLine = useCallback(async (lineData: Omit<InvoiceLine, 'id' | 'invoice_id' | 'total_price' | 'created_at' | 'updated_at'>): Promise<boolean> => {
     try {
       setError(null)
+      console.log('🔍 useInvoiceLines: Création d\'une nouvelle ligne:', lineData)
 
-      // Déterminer l'ordre de la nouvelle ligne
-      const nextOrder = invoiceLines.length > 0 
-        ? Math.max(...invoiceLines.map(line => line.ordre)) + 1 
-        : 1
+      // Le total_price sera calculé automatiquement (quantity * unit_price)
+      const dataToInsert = {
+        ...lineData,
+        total_price: lineData.quantity * lineData.unit_price
+      }
 
       const { data, error } = await supabase
         .from('invoice_lines')
-        .insert([{
-          dossier_number: options.dossierNumber,
-          designation: lineData.designation,
-          quantite: lineData.quantite,
-          prix_unitaire: lineData.prix_unitaire,
-          taux_tva: lineData.taux_tva,
-          notes: lineData.notes,
-          ordre: nextOrder
-        }])
+        .insert([dataToInsert])
         .select()
-        .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ useInvoiceLines: Erreur lors de l\'insertion:', error)
+        throw error
+      }
 
-      // Rafraîchir la liste
+      console.log('✅ useInvoiceLines: Ligne créée avec succès:', data)
+      
+      // Rafraîchir les données
       await fetchInvoiceLines()
-
-      return data
+      return true
     } catch (err) {
+      console.error('❌ useInvoiceLines: Erreur lors de la création:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la création de la ligne'
       setError(errorMessage)
-      return null
+      return false
     }
-  }, [options.dossierNumber, invoiceLines, fetchInvoiceLines])
+  }, [fetchInvoiceLines])
 
-  // Mettre à jour une ligne de facturation
-  const updateInvoiceLine = useCallback(async (lineId: string, updates: Partial<InvoiceLineFormData>): Promise<boolean> => {
+  // Mettre à jour une ligne
+  const updateInvoiceLine = useCallback(async (id: string, updates: Partial<InvoiceLine>): Promise<boolean> => {
     try {
       setError(null)
+      console.log('🔍 useInvoiceLines: Mise à jour de la ligne:', id, updates)
+
+      // Si quantity ou unit_price sont modifiés, recalculer total_price
+      const updatesWithTotal = { ...updates }
+      if (updates.quantity !== undefined || updates.unit_price !== undefined) {
+        // Récupérer les valeurs actuelles pour calculer le nouveau total
+        const { data: currentLine } = await supabase
+          .from('invoice_lines')
+          .select('quantity, unit_price')
+          .eq('id', id)
+          .single()
+
+        if (currentLine) {
+          const newQuantity = updates.quantity ?? currentLine.quantity
+          const newUnitPrice = updates.unit_price ?? currentLine.unit_price
+          updatesWithTotal.total_price = newQuantity * newUnitPrice
+        }
+      }
 
       const { error } = await supabase
         .from('invoice_lines')
-        .update(updates)
-        .eq('id', lineId)
+        .update(updatesWithTotal)
+        .eq('id', id)
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ useInvoiceLines: Erreur lors de la mise à jour:', error)
+        throw error
+      }
 
-      // Rafraîchir la liste
+      console.log('✅ useInvoiceLines: Ligne mise à jour avec succès')
+      
+      // Rafraîchir les données
       await fetchInvoiceLines()
-
       return true
     } catch (err) {
+      console.error('❌ useInvoiceLines: Erreur lors de la mise à jour:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la mise à jour de la ligne'
       setError(errorMessage)
       return false
     }
   }, [fetchInvoiceLines])
 
-  // Supprimer une ligne de facturation
-  const deleteInvoiceLine = useCallback(async (lineId: string): Promise<boolean> => {
+  // Supprimer une ligne
+  const deleteInvoiceLine = useCallback(async (id: string): Promise<boolean> => {
     try {
       setError(null)
+      console.log('🔍 useInvoiceLines: Suppression de la ligne:', id)
 
       const { error } = await supabase
         .from('invoice_lines')
         .delete()
-        .eq('id', lineId)
+        .eq('id', id)
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ useInvoiceLines: Erreur lors de la suppression:', error)
+        throw error
+      }
 
-      // Rafraîchir la liste
+      console.log('✅ useInvoiceLines: Ligne supprimée avec succès')
+      
+      // Rafraîchir les données
       await fetchInvoiceLines()
-
       return true
     } catch (err) {
+      console.error('❌ useInvoiceLines: Erreur lors de la suppression:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la suppression de la ligne'
       setError(errorMessage)
       return false
     }
   }, [fetchInvoiceLines])
 
-  // Réorganiser l'ordre des lignes
-  const reorderInvoiceLines = useCallback(async (lineIds: string[]): Promise<boolean> => {
-    try {
-      setError(null)
-
-      // Mettre à jour l'ordre de chaque ligne
-      const updatePromises = lineIds.map((lineId, index) => 
-        supabase
-          .from('invoice_lines')
-          .update({ ordre: index + 1 })
-          .eq('id', lineId)
-      )
-
-      await Promise.all(updatePromises)
-
-      // Rafraîchir la liste
-      await fetchInvoiceLines()
-
-      return true
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la réorganisation des lignes'
-      setError(errorMessage)
-      return false
-    }
-  }, [fetchInvoiceLines])
-
-  // Créer ou mettre à jour l'en-tête de facturation
-  const upsertInvoiceHeader = useCallback(async (headerData: Partial<InvoiceHeader>): Promise<boolean> => {
-    if (!options.dossierNumber) {
-      setError('Numéro de dossier requis')
-      return false
-    }
-
-    try {
-      setError(null)
-
-      const { error } = await supabase
-        .from('invoice_headers')
-        .upsert([{
-          dossier_number: options.dossierNumber,
-          ...headerData
-        }])
-
-      if (error) throw error
-
-      // Rafraîchir l'en-tête
-      await fetchInvoiceLines()
-
-      return true
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde de l\'en-tête'
-      setError(errorMessage)
-      return false
-    }
-  }, [options.dossierNumber, fetchInvoiceLines])
-
-  // Calculer les totaux
-  const totals = {
-    totalHT: invoiceLines.reduce((sum, line) => sum + line.montant_ht, 0),
-    totalTVA: invoiceLines.reduce((sum, line) => sum + line.montant_tva, 0),
-    totalTTC: invoiceLines.reduce((sum, line) => sum + line.montant_ttc, 0)
-  }
-
-  // Charger les données au montage et quand le numéro de dossier change
+  // Charger les données au montage et quand masterId change
   useEffect(() => {
+    console.log('🔍 useInvoiceLines: useEffect déclenché, masterId:', options.masterId)
     fetchInvoiceLines()
   }, [fetchInvoiceLines])
 
   return {
     invoiceLines,
-    invoiceHeader,
     loading,
     error,
-    totals,
     createInvoiceLine,
     updateInvoiceLine,
     deleteInvoiceLine,
-    reorderInvoiceLines,
-    upsertInvoiceHeader,
     refetch: fetchInvoiceLines
   }
 }

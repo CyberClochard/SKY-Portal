@@ -1465,12 +1465,11 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
         />
         
         {/* Card 1: Ventes (pleine largeur) */}
-                {/* Card 1: Ventes (pleine largeur) - Gestion des lignes de facturation */}
         <Card>
           <CardHeader icon={<Euro className="w-5 h-5" />} title="Ventes - Lignes de facturation" />
           <CardContent>
             <InvoiceLinesManager 
-              dossierNumber={dossier}
+              masterId={dossier}
               onUpdate={() => {
                 // Rafraîchir les données si nécessaire
                 console.log('Lignes de facturation mises à jour')
