@@ -13,8 +13,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   masterId,
   onUpdate
 }) => {
-  console.log('🔍 InvoiceLinesManager: Rendu avec masterId:', masterId)
-  console.log('🔍 InvoiceLinesManager: Composant monté dans CaseModal')
+
   
   const {
     invoiceLines,
@@ -25,12 +24,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
     deleteInvoiceLine
   } = useInvoiceLines({ masterId })
 
-  console.log('🔍 InvoiceLinesManager: État actuel:', { 
-    lignesCount: invoiceLines.length, 
-    loading, 
-    error,
-    masterId 
-  })
+
 
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -46,13 +40,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   const [pdfBlob, setPdfBlob] = useState<Blob | undefined>()
   const [pdfFileName, setPdfFileName] = useState<string | undefined>()
 
-  // Effet pour surveiller les changements d'état du PDF
-  useEffect(() => {
-    console.log('🔍 État PDF mis à jour:')
-    console.log('  - showPDFDownload:', showPDFDownload)
-    console.log('  - pdfBlob:', pdfBlob ? `Blob de ${pdfBlob.size} bytes` : 'undefined')
-    console.log('  - pdfFileName:', pdfFileName)
-  }, [showPDFDownload, pdfBlob, pdfFileName])
+
 
   const handleAddLine = async () => {
     if (!newLine.description.trim()) return
@@ -147,32 +135,16 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       console.log('📋 Données de facture préparées:', invoiceData)
 
       // Envoyer au webhook n8n
-      console.log('📤 Appel de sendInvoiceDataToWebhook...')
       const result = await sendInvoiceDataToWebhook(invoiceData)
-      console.log('📥 Résultat reçu de sendInvoiceDataToWebhook:', result)
 
       if (result.success) {
         setInvoiceMessage({ type: 'success', text: result.message })
-        console.log('✅ Facture créée avec succès via n8n')
-        console.log('📄 Vérification du PDF:', {
-          hasPdfBlob: !!result.pdfBlob,
-          pdfBlobType: result.pdfBlob?.type,
-          pdfBlobSize: result.pdfBlob?.size,
-          fileName: result.fileName
-        })
         
         // Si un PDF a été généré, afficher le composant de téléchargement
         if (result.pdfBlob) {
-          console.log('📄 PDF binaire reçu:', result.pdfBlob)
-          console.log('📄 Nom du fichier:', result.fileName)
           setPdfBlob(result.pdfBlob)
           setPdfFileName(result.fileName)
           setShowPDFDownload(true)
-          console.log('📄 État showPDFDownload mis à true')
-          console.log('📄 État pdfBlob mis à jour')
-          console.log('📄 État pdfFileName mis à jour')
-        } else {
-          console.log('⚠️ Aucun PDF reçu dans la réponse')
         }
       } else {
         setInvoiceMessage({ type: 'error', text: result.message })
@@ -217,10 +189,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Indicateur de débogage visible */}
-      <div className="bg-blue-100 border border-blue-300 text-blue-800 px-3 py-2 rounded text-sm mb-4">
-        🔵 DEBUG: InvoiceLinesManager rendu - masterId: {masterId}
-      </div>
+
       
       {/* Bouton Ajouter */}
       <div className="flex justify-between items-center mb-4">
@@ -455,23 +424,13 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
         pdfBlob={pdfBlob}
         fileName={pdfFileName}
         onClose={() => {
-          console.log('🔒 Fermeture du modal PDF')
           setShowPDFDownload(false)
           setPdfBlob(undefined)
           setPdfFileName(undefined)
         }}
       />
 
-      {/* Indicateur de débogage temporaire */}
-      {showPDFDownload && (
-        <div className="fixed top-4 right-4 bg-red-500 text-white p-2 rounded z-50">
-          🔴 DEBUG: Modal PDF activé
-          <br />
-          Blob: {pdfBlob ? `${pdfBlob.size} bytes` : 'undefined'}
-          <br />
-          File: {pdfFileName || 'undefined'}
-        </div>
-      )}
+
     </div>
   )
 }
