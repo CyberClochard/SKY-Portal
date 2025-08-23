@@ -674,17 +674,21 @@ export const testWebhookConnectivity = async (): Promise<{ success: boolean; mes
     console.log('🔍 Test de connectivité au webhook n8n...')
     console.log('🔗 URL testée:', webhookUrl)
     
+    // Essayer d'abord avec le proxy local Vite
+    const localProxyUrl = `/n8n-webhook/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9`
+    console.log('🔄 Tentative avec proxy local Vite:', localProxyUrl)
+    
     const startTime = Date.now()
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(localProxyUrl, {
       method: 'GET', // Test simple avec GET
       headers: {
         'Accept': 'application/json',
       },
-      signal: AbortSignal.timeout(10000) // 10 secondes pour le test
+      signal: AbortSignal.timeout(10000) // 10 secondes pour le proxy local
     })
     const endTime = Date.now()
     
-    console.log('📥 Test de connectivité réussi:', {
+    console.log('📥 Test de connectivité réussi via proxy local:', {
       status: response.status,
       statusText: response.statusText,
       responseTime: `${endTime - startTime}ms`,
@@ -693,31 +697,68 @@ export const testWebhookConnectivity = async (): Promise<{ success: boolean; mes
     
     return {
       success: true,
-      message: `Connectivité OK - Réponse ${response.status} en ${endTime - startTime}ms`,
+      message: `Connectivité OK via proxy local - Réponse ${response.status} en ${endTime - startTime}ms`,
       details: {
         status: response.status,
-        responseTime: endTime - startTime
+        responseTime: endTime - startTime,
+        method: 'local-proxy'
       }
     }
     
   } catch (error) {
-    console.error('❌ Test de connectivité échoué:', error)
+    console.error('❌ Test de connectivité échoué avec proxy local:', error)
     
-    let errorDetails = 'Erreur inconnue'
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        errorDetails = 'Timeout de la requête (10s dépassé)'
-      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorDetails = 'Erreur de réseau ou CORS - Vérifiez la connectivité internet et les restrictions CORS'
-      } else {
-        errorDetails = error.message
+    // Essayer avec le proxy CORS externe en fallback
+    try {
+      console.log('🔄 Tentative avec proxy CORS externe...')
+      const corsProxyUrl = `https://cors-anywhere.herokuapp.com/${webhookUrl}`
+      
+      const startTime = Date.now()
+      const response = await fetch(corsProxyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Origin': 'http://localhost:5173'
+        },
+        signal: AbortSignal.timeout(15000)
+      })
+      const endTime = Date.now()
+      
+      console.log('📥 Test de connectivité réussi via proxy CORS externe:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseTime: `${endTime - startTime}ms`
+      })
+      
+      return {
+        success: true,
+        message: `Connectivité OK via proxy CORS externe - Réponse ${response.status} en ${endTime - startTime}ms`,
+        details: {
+          status: response.status,
+          responseTime: endTime - startTime,
+          method: 'cors-proxy'
+        }
       }
-    }
-    
-    return {
-      success: false,
-      message: `Test de connectivité échoué: ${errorDetails}`,
-      details: { error: errorDetails }
+      
+    } catch (corsError) {
+      console.error('❌ Test de connectivité échoué avec tous les proxies:', corsError)
+      
+      let errorDetails = 'Erreur inconnue'
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorDetails = 'Timeout de la requête dépassé'
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorDetails = 'Erreur de réseau ou CORS - Vérifiez la connectivité internet et les restrictions CORS'
+        } else {
+          errorDetails = error.message
+        }
+      }
+      
+      return {
+        success: false,
+        message: `Test de connectivité échoué: ${errorDetails}`,
+        details: { error: errorDetails }
+      }
     }
   }
 }
@@ -730,10 +771,11 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     console.log('📤 Envoi des données de facturation au webhook n8n:', invoiceData)
     console.log('🔗 URL du webhook:', webhookUrl)
     
-    // Vérifier la connectivité avant l'envoi
-    console.log('🔍 Test de connectivité au webhook...')
+    // Utiliser le proxy local Vite en priorité
+    const localProxyUrl = `/n8n-webhook/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9`
+    console.log('🔄 Utilisation du proxy local Vite:', localProxyUrl)
     
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(localProxyUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
