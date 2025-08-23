@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Save, X, FileText } from 'lucide-react'
 import { useInvoiceLines, InvoiceLine } from '../hooks/useInvoiceLines'
 import { sendInvoiceDataToWebhook, testWebhookConnectivity } from '../lib/supabase'
@@ -44,6 +44,14 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   const [showPDFDownload, setShowPDFDownload] = useState(false)
   const [pdfBlob, setPdfBlob] = useState<Blob | undefined>()
   const [pdfFileName, setPdfFileName] = useState<string | undefined>()
+
+  // Effet pour surveiller les changements d'état du PDF
+  useEffect(() => {
+    console.log('🔍 État PDF mis à jour:')
+    console.log('  - showPDFDownload:', showPDFDownload)
+    console.log('  - pdfBlob:', pdfBlob ? `Blob de ${pdfBlob.size} bytes` : 'undefined')
+    console.log('  - pdfFileName:', pdfFileName)
+  }, [showPDFDownload, pdfBlob, pdfFileName])
 
   const handleAddLine = async () => {
     if (!newLine.description.trim()) return
@@ -146,10 +154,14 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
         
         // Si un PDF a été généré, afficher le composant de téléchargement
         if (result.pdfBlob) {
+          console.log('📄 PDF binaire reçu:', result.pdfBlob)
+          console.log('📄 Nom du fichier:', result.fileName)
           setPdfBlob(result.pdfBlob)
           setPdfFileName(result.fileName)
           setShowPDFDownload(true)
-          console.log('📄 PDF binaire reçu, affichage du composant de téléchargement')
+          console.log('📄 État showPDFDownload mis à true')
+          console.log('📄 État pdfBlob mis à jour')
+          console.log('📄 État pdfFileName mis à jour')
         }
       } else {
         setInvoiceMessage({ type: 'error', text: result.message })
@@ -427,6 +439,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
         pdfBlob={pdfBlob}
         fileName={pdfFileName}
         onClose={() => {
+          console.log('🔒 Fermeture du modal PDF')
           setShowPDFDownload(false)
           setPdfBlob(undefined)
           setPdfFileName(undefined)
