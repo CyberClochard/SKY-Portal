@@ -14,6 +14,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   onUpdate
 }) => {
   console.log('🔍 InvoiceLinesManager: Rendu avec masterId:', masterId)
+  console.log('🔍 InvoiceLinesManager: Composant monté dans CaseModal')
   
   const {
     invoiceLines,
@@ -216,6 +217,11 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Indicateur de débogage visible */}
+      <div className="bg-blue-100 border border-blue-300 text-blue-800 px-3 py-2 rounded text-sm mb-4">
+        🔵 DEBUG: InvoiceLinesManager rendu - masterId: {masterId}
+      </div>
+      
       {/* Bouton Ajouter */}
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
