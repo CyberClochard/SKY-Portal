@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Plus, Edit, Trash2, Save, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X, FileText } from 'lucide-react'
 import { useInvoiceLines, InvoiceLine } from '../hooks/useInvoiceLines'
+import { sendInvoiceDataToWebhook } from '../lib/supabase'
 
 interface InvoiceLinesManagerProps {
   masterId: string
@@ -27,15 +28,19 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
     quantity: 1,
     unit_price: 0
   })
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false)
+  const [invoiceMessage, setInvoiceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleAddLine = async () => {
     if (!newLine.description.trim()) return
 
     const success = await createInvoiceLine({
+      invoice_id: '', // Sera rempli par la base de données
       master_id: masterId,
       description: newLine.description.trim(),
       quantity: newLine.quantity,
-      unit_price: newLine.unit_price
+      unit_price: newLine.unit_price,
+      total_price: 0 // Sera calculé automatiquement
     })
 
     if (success) {
@@ -59,6 +64,59 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       if (success) {
         onUpdate?.()
       }
+    }
+  }
+
+  const handleCreateInvoice = async () => {
+    if (invoiceLines.length === 0) {
+      setInvoiceMessage({ type: 'error', text: 'Aucune ligne de facturation à traiter' })
+      return
+    }
+
+    setIsCreatingInvoice(true)
+    setInvoiceMessage(null)
+
+    try {
+      // Calculer le montant total
+      const totalAmount = invoiceLines.reduce((sum, line) => sum + line.total_price, 0)
+
+      // Préparer les données pour le webhook
+      const invoiceData = {
+        master_id: masterId,
+        dossier_number: masterId,
+        client_name: `Dossier ${masterId}`,
+        invoice_lines: invoiceLines.map(line => ({
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          total_price: line.total_price
+        })),
+        total_amount: totalAmount,
+        created_at: new Date().toISOString(),
+        source: 'SkyLogistics WebApp'
+      }
+
+      console.log('📋 Données de facture préparées:', invoiceData)
+
+      // Envoyer au webhook n8n
+      const result = await sendInvoiceDataToWebhook(invoiceData)
+
+      if (result.success) {
+        setInvoiceMessage({ type: 'success', text: result.message })
+        console.log('✅ Facture créée avec succès via n8n')
+      } else {
+        setInvoiceMessage({ type: 'error', text: result.message })
+        console.error('❌ Erreur lors de la création de la facture:', result.message)
+      }
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de la facture:', error)
+      setInvoiceMessage({ 
+        type: 'error', 
+        text: `Erreur lors de la création de la facture: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
+      })
+    } finally {
+      setIsCreatingInvoice(false)
     }
   }
 
@@ -90,20 +148,39 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   return (
     <div className="space-y-4">
       {/* Bouton Ajouter */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          Lignes de facturation ({invoiceLines.length})
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Lignes de facturation
         </h3>
-        {!isAdding && (
+        <div className="flex gap-2">
           <button
             onClick={() => setIsAdding(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            <Plus className="w-4 h-4" />
-            <span>Ajouter</span>
+            <Plus className="w-4 h-4 mr-1" />
+            Ajouter
           </button>
-        )}
+          <button
+            onClick={handleCreateInvoice}
+            disabled={isCreatingInvoice || invoiceLines.length === 0}
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            {isCreatingInvoice ? 'Création...' : 'Créer Facture'}
+          </button>
+        </div>
       </div>
+
+      {/* Messages de succès/erreur */}
+      {invoiceMessage && (
+        <div className={`mb-4 p-3 rounded-md ${
+          invoiceMessage.type === 'success' 
+            ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
+            : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400'
+        }`}>
+          {invoiceMessage.text}
+        </div>
+      )}
 
       {/* Formulaire d'ajout */}
       {isAdding && (

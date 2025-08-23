@@ -649,3 +649,65 @@ export const fixExistingPaymentAllocationStatus = async (): Promise<{ success: b
     }
   }
 }
+
+// Interface pour les données de facturation à envoyer au webhook n8n
+export interface InvoiceDataForWebhook {
+  master_id: string
+  dossier_number: string
+  client_name?: string
+  invoice_lines: {
+    description: string
+    quantity: number
+    unit_price: number
+    total_price: number
+  }[]
+  total_amount: number
+  created_at: string
+  source: string
+}
+
+// Function to send invoice data to n8n webhook for PDF generation
+export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any }> => {
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
+  
+  try {
+    console.log('📤 Envoi des données de facturation au webhook n8n:', invoiceData)
+    
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(invoiceData)
+    })
+    
+    const responseText = await response.text()
+    console.log('📥 Réponse du webhook n8n:', responseText)
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
+    }
+    
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+    } catch (parseError) {
+      console.log('⚠️ Réponse non-JSON du webhook:', responseText)
+      responseData = { message: responseText }
+    }
+    
+    console.log('✅ Données de facturation envoyées avec succès au webhook n8n')
+    return {
+      success: true,
+      message: 'Facture envoyée au webhook n8n avec succès',
+      response: responseData
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'envoi au webhook n8n:', error)
+    return {
+      success: false,
+      message: `Erreur lors de l'envoi au webhook: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+    }
+  }
+}

@@ -1,0 +1,6 @@
+README_INVOICE_LINES_SYSTEM.md
+src/components/CaseModal.tsx
+src/components/InvoiceLinesManager.tsx
+src/hooks/useInvoiceLines.ts
+supabase/migrations/20250715000005_create_invoice_lines.sql
+test_invoice_lines.sql

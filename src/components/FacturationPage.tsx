@@ -3,6 +3,7 @@ import { supabase, sendPDFsToWebhook } from '../lib/supabase'
 import { RefreshCw, FileText, AlertCircle, Plus } from 'lucide-react'
 import { formatDate } from '../utils/dateUtils'
 import InvoiceImportModal from './InvoiceImportModal'
+import CreateInvoiceModal from './CreateInvoiceModal'
 import SearchAndFilters from './SearchAndFilters'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -30,6 +31,7 @@ const FacturationPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [loadingNotes, setLoadingNotes] = useState<Set<string>>(new Set())
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false)
   
   // États pour la recherche et les filtres
   const [searchTerm, setSearchTerm] = useState('')
@@ -277,6 +279,14 @@ const FacturationPage: React.FC = () => {
             <Plus className="w-4 h-4" />
             <span>Import SAGE</span>
           </button>
+          <button 
+            onClick={() => setIsCreateInvoiceModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+            title="Ouvrir la liste des dossiers pour créer une facture"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Créer Facture</span>
+          </button>
         </div>
       </div>
 
@@ -449,6 +459,12 @@ const FacturationPage: React.FC = () => {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportInvoices}
+      />
+
+      {/* Create Invoice Modal */}
+      <CreateInvoiceModal
+        isOpen={isCreateInvoiceModalOpen}
+        onClose={() => setIsCreateInvoiceModalOpen(false)}
       />
     </div>
   )
