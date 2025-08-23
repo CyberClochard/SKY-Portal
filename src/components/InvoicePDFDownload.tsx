@@ -3,34 +3,31 @@ import { Download, FileText, Eye, X } from 'lucide-react'
 import { Card, CardContent, CardHeader } from './ui/Card'
 
 interface InvoicePDFDownloadProps {
-  pdfUrl?: string
+  pdfBlob?: Blob
   fileName?: string
   onClose?: () => void
   isVisible: boolean
 }
 
 export const InvoicePDFDownload: React.FC<InvoicePDFDownloadProps> = ({
-  pdfUrl,
+  pdfBlob,
   fileName,
   onClose,
   isVisible
 }) => {
   const [isLoading, setIsLoading] = useState(false)
 
-  if (!isVisible || !pdfUrl) {
+  if (!isVisible || !pdfBlob) {
     return null
   }
 
-  const handleDownload = async () => {
-    if (!pdfUrl) return
+  const handleDownload = () => {
+    if (!pdfBlob) return
 
     setIsLoading(true)
     try {
-      const response = await fetch(pdfUrl)
-      const blob = await response.blob()
-      
-      // Créer un lien de téléchargement
-      const url = window.URL.createObjectURL(blob)
+      // Créer un lien de téléchargement directement depuis le blob
+      const url = window.URL.createObjectURL(pdfBlob)
       const link = document.createElement('a')
       link.href = url
       link.download = fileName || `facture_${Date.now()}.pdf`
@@ -50,8 +47,12 @@ export const InvoicePDFDownload: React.FC<InvoicePDFDownloadProps> = ({
   }
 
   const handleViewPDF = () => {
-    if (pdfUrl) {
-      window.open(pdfUrl, '_blank')
+    if (pdfBlob) {
+      // Créer une URL temporaire pour afficher le PDF
+      const url = window.URL.createObjectURL(pdfBlob)
+      window.open(url, '_blank')
+      // Nettoyer l'URL après un délai
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000)
     }
   }
 

@@ -42,7 +42,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   const [isTestingConnectivity, setIsTestingConnectivity] = useState(false)
   const [invoiceMessage, setInvoiceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showPDFDownload, setShowPDFDownload] = useState(false)
-  const [pdfUrl, setPdfUrl] = useState<string | undefined>()
+  const [pdfBlob, setPdfBlob] = useState<Blob | undefined>()
   const [pdfFileName, setPdfFileName] = useState<string | undefined>()
 
   const handleAddLine = async () => {
@@ -145,11 +145,11 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
         console.log('✅ Facture créée avec succès via n8n')
         
         // Si un PDF a été généré, afficher le composant de téléchargement
-        if (result.pdfUrl) {
-          setPdfUrl(result.pdfUrl)
+        if (result.pdfBlob) {
+          setPdfBlob(result.pdfBlob)
           setPdfFileName(result.fileName)
           setShowPDFDownload(true)
-          console.log('📄 PDF généré, affichage du composant de téléchargement')
+          console.log('📄 PDF binaire reçu, affichage du composant de téléchargement')
         }
       } else {
         setInvoiceMessage({ type: 'error', text: result.message })
@@ -424,11 +424,11 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       {/* Composant de téléchargement PDF */}
       <InvoicePDFDownload
         isVisible={showPDFDownload}
-        pdfUrl={pdfUrl}
+        pdfBlob={pdfBlob}
         fileName={pdfFileName}
         onClose={() => {
           setShowPDFDownload(false)
-          setPdfUrl(undefined)
+          setPdfBlob(undefined)
           setPdfFileName(undefined)
         }}
       />

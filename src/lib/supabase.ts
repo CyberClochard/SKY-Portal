@@ -764,7 +764,7 @@ export const testWebhookConnectivity = async (): Promise<{ success: boolean; mes
 }
 
 // Function to send invoice data to n8n webhook for PDF generation
-export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any; pdfUrl?: string; fileName?: string }> => {
+export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any; pdfBlob?: Blob; fileName?: string }> => {
   const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
   
   try {
@@ -779,7 +779,7 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'application/pdf, application/json, */*',
       },
       body: JSON.stringify(invoiceData),
       // Ajouter un timeout pour éviter les blocages
@@ -788,49 +788,53 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     
     console.log('📥 Statut de la réponse:', response.status, response.statusText)
     console.log('📥 Headers de la réponse:', Object.fromEntries(response.headers.entries()))
-    
-    const responseText = await response.text()
-    console.log('📥 Contenu de la réponse:', responseText)
+    console.log('📥 Content-Type de la réponse:', response.headers.get('content-type'))
     
     if (!response.ok) {
       throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
     }
     
-    let responseData
-    let pdfUrl: string | undefined
-    let fileName: string | undefined
+    // Vérifier si la réponse est un PDF binaire
+    const contentType = response.headers.get('content-type')
+    const isPDF = contentType && (contentType.includes('application/pdf') || contentType.includes('binary') || contentType.includes('octet-stream'))
     
-    try {
-      responseData = JSON.parse(responseText)
-      console.log('✅ Réponse JSON parsée:', responseData)
+    if (isPDF) {
+      console.log('📄 Réponse détectée comme PDF binaire')
       
-      // Extraire l'URL du PDF et le nom du fichier de la réponse
-      pdfUrl = responseData.pdf_url || responseData.pdfUrl || responseData.url || responseData.file_url
-      fileName = responseData.file_name || responseData.fileName || responseData.filename || `facture_${invoiceData.master_id}_${Date.now()}.pdf`
+      // Récupérer le blob PDF
+      const pdfBlob = await response.blob()
+      console.log('📄 Blob PDF récupéré:', pdfBlob.size, 'bytes, type:', pdfBlob.type)
       
-      console.log('📄 URL du PDF extraite:', pdfUrl)
-      console.log('📄 Nom du fichier extrait:', fileName)
+      // Générer un nom de fichier
+      const fileName = `facture_${invoiceData.master_id}_${Date.now()}.pdf`
       
-    } catch (parseError) {
-      console.log('⚠️ Réponse non-JSON du webhook:', responseText)
-      responseData = { message: responseText }
-      
-      // Essayer d'extraire une URL du texte brut
-      const urlMatch = responseText.match(/https?:\/\/[^\s"<>]+\.pdf/i)
-      if (urlMatch) {
-        pdfUrl = urlMatch[0]
-        fileName = `facture_${invoiceData.master_id}_${Date.now()}.pdf`
-        console.log('📄 URL du PDF extraite du texte brut:', pdfUrl)
+      console.log('✅ PDF binaire reçu avec succès du webhook n8n')
+      return {
+        success: true,
+        message: 'Facture PDF générée avec succès par le workflow n8n',
+        pdfBlob,
+        fileName
       }
-    }
-    
-    console.log('✅ Données de facturation envoyées avec succès au webhook n8n')
-    return {
-      success: true,
-      message: 'Facture envoyée au webhook n8n avec succès',
-      response: responseData,
-      pdfUrl,
-      fileName
+    } else {
+      // Essayer de traiter comme du JSON ou du texte
+      const responseText = await response.text()
+      console.log('📥 Contenu de la réponse texte:', responseText)
+      
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+        console.log('✅ Réponse JSON parsée:', responseData)
+      } catch (parseError) {
+        console.log('⚠️ Réponse non-JSON du webhook:', responseText)
+        responseData = { message: responseText }
+      }
+      
+      console.log('✅ Données de facturation envoyées avec succès au webhook n8n')
+      return {
+        success: true,
+        message: 'Facture envoyée au webhook n8n avec succès',
+        response: responseData
+      }
     }
     
   } catch (error) {
