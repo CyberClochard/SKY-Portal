@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Plus, Edit, Trash2, Save, X, FileText } from 'lucide-react'
 import { useInvoiceLines, InvoiceLine } from '../hooks/useInvoiceLines'
-import { sendInvoiceDataToWebhook } from '../lib/supabase'
+import { sendInvoiceDataToWebhook, testWebhookConnectivity } from '../lib/supabase'
 
 interface InvoiceLinesManagerProps {
   masterId: string
@@ -12,6 +12,8 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   masterId,
   onUpdate
 }) => {
+  console.log('🔍 InvoiceLinesManager: Rendu avec masterId:', masterId)
+  
   const {
     invoiceLines,
     loading,
@@ -21,6 +23,13 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
     deleteInvoiceLine
   } = useInvoiceLines({ masterId })
 
+  console.log('🔍 InvoiceLinesManager: État actuel:', { 
+    lignesCount: invoiceLines.length, 
+    loading, 
+    error,
+    masterId 
+  })
+
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newLine, setNewLine] = useState({
@@ -29,18 +38,17 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
     unit_price: 0
   })
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false)
+  const [isTestingConnectivity, setIsTestingConnectivity] = useState(false)
   const [invoiceMessage, setInvoiceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleAddLine = async () => {
     if (!newLine.description.trim()) return
 
     const success = await createInvoiceLine({
-      invoice_id: '', // Sera rempli par la base de données
       master_id: masterId,
       description: newLine.description.trim(),
       quantity: newLine.quantity,
       unit_price: newLine.unit_price,
-      total_price: 0 // Sera calculé automatiquement
     })
 
     if (success) {
@@ -64,6 +72,33 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       if (success) {
         onUpdate?.()
       }
+    }
+  }
+
+  const handleTestConnectivity = async () => {
+    setIsTestingConnectivity(true)
+    setInvoiceMessage(null)
+
+    try {
+      console.log('🔍 Test de connectivité au webhook n8n...')
+      const result = await testWebhookConnectivity()
+
+      if (result.success) {
+        setInvoiceMessage({ type: 'success', text: result.message })
+        console.log('✅ Test de connectivité réussi:', result.details)
+      } else {
+        setInvoiceMessage({ type: 'error', text: result.message })
+        console.error('❌ Test de connectivité échoué:', result.details)
+      }
+
+    } catch (error) {
+      console.error('❌ Erreur lors du test de connectivité:', error)
+      setInvoiceMessage({ 
+        type: 'error', 
+        text: `Erreur lors du test: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
+      })
+    } finally {
+      setIsTestingConnectivity(false)
     }
   }
 
@@ -161,15 +196,24 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
             Ajouter
           </button>
           <button
-            onClick={handleCreateInvoice}
-            disabled={isCreatingInvoice || invoiceLines.length === 0}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FileText className="w-4 h-4 mr-1" />
-            {isCreatingInvoice ? 'Création...' : 'Créer Facture'}
-          </button>
+            onClick={handleTestConnectivity}
+              disabled={isTestingConnectivity}
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Tester la connectivité au webhook n8n"
+            >
+              🔍
+              {isTestingConnectivity ? 'Test...' : 'Test Webhook'}
+            </button>
+            <button
+              onClick={handleCreateInvoice}
+              disabled={isCreatingInvoice || invoiceLines.length === 0}
+              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              {isCreatingInvoice ? 'Création...' : 'Créer Facture'}
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* Messages de succès/erreur */}
       {invoiceMessage && (

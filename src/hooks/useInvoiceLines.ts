@@ -3,12 +3,12 @@ import { supabase } from '../lib/supabase'
 
 export interface InvoiceLine {
   id: string
-  invoice_id: string
+  invoice_id?: string // lecture uniquement
   master_id: string
   description: string
   quantity: number
   unit_price: number
-  total_price: number
+  total_price: number // remplissage auto (quantity * unit_price)
   created_at?: string
   updated_at?: string
 }
@@ -25,6 +25,7 @@ export const useInvoiceLines = (options: UseInvoiceLinesOptions) => {
   // Récupérer les lignes de facturation pour un dossier
   const fetchInvoiceLines = useCallback(async () => {
     if (!options.masterId) {
+      console.log('⚠️ useInvoiceLines: Pas de masterId fourni')
       setInvoiceLines([])
       setLoading(false)
       return
@@ -33,6 +34,7 @@ export const useInvoiceLines = (options: UseInvoiceLinesOptions) => {
     try {
       setLoading(true)
       setError(null)
+      console.log('🔍 useInvoiceLines: Chargement des lignes pour masterId:', options.masterId)
 
       const { data: linesData, error: linesError } = await supabase
         .from('invoice_lines')
@@ -40,10 +42,15 @@ export const useInvoiceLines = (options: UseInvoiceLinesOptions) => {
         .eq('master_id', options.masterId)
         .order('created_at', { ascending: true })
 
-      if (linesError) throw linesError
+      if (linesError) {
+        console.error('❌ useInvoiceLines: Erreur lors du chargement:', linesError)
+        throw linesError
+      }
 
+      console.log('✅ useInvoiceLines: Lignes chargées:', linesData?.length || 0, 'lignes trouvées')
       setInvoiceLines(linesData || [])
     } catch (err) {
+      console.error('❌ useInvoiceLines: Erreur lors du chargement:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des lignes de facturation'
       setError(errorMessage)
       setInvoiceLines([])
@@ -53,26 +60,34 @@ export const useInvoiceLines = (options: UseInvoiceLinesOptions) => {
   }, [options.masterId])
 
   // Créer une nouvelle ligne
-  const createInvoiceLine = useCallback(async (lineData: Omit<InvoiceLine, 'id' | 'created_at' | 'updated_at'>): Promise<boolean> => {
+  const createInvoiceLine = useCallback(async (lineData: Omit<InvoiceLine, 'id' | 'invoice_id' | 'total_price' | 'created_at' | 'updated_at'>): Promise<boolean> => {
     try {
       setError(null)
+      console.log('🔍 useInvoiceLines: Création d\'une nouvelle ligne:', lineData)
 
-      // Calculer automatiquement le total_price
-      const totalPrice = lineData.quantity * lineData.unit_price
+      // Le total_price sera calculé automatiquement (quantity * unit_price)
+      const dataToInsert = {
+        ...lineData,
+        total_price: lineData.quantity * lineData.unit_price
+      }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('invoice_lines')
-        .insert([{
-          ...lineData,
-          total_price: totalPrice
-        }])
+        .insert([dataToInsert])
+        .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ useInvoiceLines: Erreur lors de l\'insertion:', error)
+        throw error
+      }
 
+      console.log('✅ useInvoiceLines: Ligne créée avec succès:', data)
+      
       // Rafraîchir les données
       await fetchInvoiceLines()
       return true
     } catch (err) {
+      console.error('❌ useInvoiceLines: Erreur lors de la création:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la création de la ligne'
       setError(errorMessage)
       return false

@@ -666,23 +666,89 @@ export interface InvoiceDataForWebhook {
   source: string
 }
 
+// Function to test webhook connectivity
+export const testWebhookConnectivity = async (): Promise<{ success: boolean; message: string; details?: any }> => {
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
+  
+  try {
+    console.log('🔍 Test de connectivité au webhook n8n...')
+    console.log('🔗 URL testée:', webhookUrl)
+    
+    const startTime = Date.now()
+    const response = await fetch(webhookUrl, {
+      method: 'GET', // Test simple avec GET
+      headers: {
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000) // 10 secondes pour le test
+    })
+    const endTime = Date.now()
+    
+    console.log('📥 Test de connectivité réussi:', {
+      status: response.status,
+      statusText: response.statusText,
+      responseTime: `${endTime - startTime}ms`,
+      headers: Object.fromEntries(response.headers.entries())
+    })
+    
+    return {
+      success: true,
+      message: `Connectivité OK - Réponse ${response.status} en ${endTime - startTime}ms`,
+      details: {
+        status: response.status,
+        responseTime: endTime - startTime
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Test de connectivité échoué:', error)
+    
+    let errorDetails = 'Erreur inconnue'
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        errorDetails = 'Timeout de la requête (10s dépassé)'
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorDetails = 'Erreur de réseau ou CORS - Vérifiez la connectivité internet et les restrictions CORS'
+      } else {
+        errorDetails = error.message
+      }
+    }
+    
+    return {
+      success: false,
+      message: `Test de connectivité échoué: ${errorDetails}`,
+      details: { error: errorDetails }
+    }
+  }
+}
+
 // Function to send invoice data to n8n webhook for PDF generation
 export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any }> => {
   const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
   
   try {
     console.log('📤 Envoi des données de facturation au webhook n8n:', invoiceData)
+    console.log('🔗 URL du webhook:', webhookUrl)
+    
+    // Vérifier la connectivité avant l'envoi
+    console.log('🔍 Test de connectivité au webhook...')
     
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      body: JSON.stringify(invoiceData)
+      body: JSON.stringify(invoiceData),
+      // Ajouter un timeout pour éviter les blocages
+      signal: AbortSignal.timeout(30000) // 30 secondes
     })
     
+    console.log('📥 Statut de la réponse:', response.status, response.statusText)
+    console.log('📥 Headers de la réponse:', Object.fromEntries(response.headers.entries()))
+    
     const responseText = await response.text()
-    console.log('📥 Réponse du webhook n8n:', responseText)
+    console.log('📥 Contenu de la réponse:', responseText)
     
     if (!response.ok) {
       throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
@@ -691,6 +757,7 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     let responseData
     try {
       responseData = JSON.parse(responseText)
+      console.log('✅ Réponse JSON parsée:', responseData)
     } catch (parseError) {
       console.log('⚠️ Réponse non-JSON du webhook:', responseText)
       responseData = { message: responseText }
@@ -705,9 +772,22 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     
   } catch (error) {
     console.error('❌ Erreur lors de l\'envoi au webhook n8n:', error)
+    
+    // Détails de l'erreur selon le type
+    let errorDetails = 'Erreur inconnue'
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        errorDetails = 'Timeout de la requête (30s dépassé)'
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorDetails = 'Erreur de réseau ou CORS'
+      } else {
+        errorDetails = error.message
+      }
+    }
+    
     return {
       success: false,
-      message: `Erreur lors de l'envoi au webhook: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+      message: `Erreur lors de l'envoi au webhook: ${errorDetails}`
     }
   }
 }
