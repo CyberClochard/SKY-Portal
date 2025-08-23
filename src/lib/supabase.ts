@@ -764,7 +764,7 @@ export const testWebhookConnectivity = async (): Promise<{ success: boolean; mes
 }
 
 // Function to send invoice data to n8n webhook for PDF generation
-export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any }> => {
+export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any; pdfUrl?: string; fileName?: string }> => {
   const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
   
   try {
@@ -797,19 +797,40 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     }
     
     let responseData
+    let pdfUrl: string | undefined
+    let fileName: string | undefined
+    
     try {
       responseData = JSON.parse(responseText)
       console.log('✅ Réponse JSON parsée:', responseData)
+      
+      // Extraire l'URL du PDF et le nom du fichier de la réponse
+      pdfUrl = responseData.pdf_url || responseData.pdfUrl || responseData.url || responseData.file_url
+      fileName = responseData.file_name || responseData.fileName || responseData.filename || `facture_${invoiceData.master_id}_${Date.now()}.pdf`
+      
+      console.log('📄 URL du PDF extraite:', pdfUrl)
+      console.log('📄 Nom du fichier extrait:', fileName)
+      
     } catch (parseError) {
       console.log('⚠️ Réponse non-JSON du webhook:', responseText)
       responseData = { message: responseText }
+      
+      // Essayer d'extraire une URL du texte brut
+      const urlMatch = responseText.match(/https?:\/\/[^\s"<>]+\.pdf/i)
+      if (urlMatch) {
+        pdfUrl = urlMatch[0]
+        fileName = `facture_${invoiceData.master_id}_${Date.now()}.pdf`
+        console.log('📄 URL du PDF extraite du texte brut:', pdfUrl)
+      }
     }
     
     console.log('✅ Données de facturation envoyées avec succès au webhook n8n')
     return {
       success: true,
       message: 'Facture envoyée au webhook n8n avec succès',
-      response: responseData
+      response: responseData,
+      pdfUrl,
+      fileName
     }
     
   } catch (error) {

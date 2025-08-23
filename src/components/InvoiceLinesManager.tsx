@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Plus, Edit, Trash2, Save, X, FileText } from 'lucide-react'
 import { useInvoiceLines, InvoiceLine } from '../hooks/useInvoiceLines'
 import { sendInvoiceDataToWebhook, testWebhookConnectivity } from '../lib/supabase'
+import { InvoicePDFDownload } from './InvoicePDFDownload'
 
 interface InvoiceLinesManagerProps {
   masterId: string
@@ -40,6 +41,9 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false)
   const [isTestingConnectivity, setIsTestingConnectivity] = useState(false)
   const [invoiceMessage, setInvoiceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showPDFDownload, setShowPDFDownload] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState<string | undefined>()
+  const [pdfFileName, setPdfFileName] = useState<string | undefined>()
 
   const handleAddLine = async () => {
     if (!newLine.description.trim()) return
@@ -51,18 +55,18 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       unit_price: newLine.unit_price,
     })
 
-    if (success) {
+      if (success) {
       setNewLine({ description: '', quantity: 1, unit_price: 0 })
       setIsAdding(false)
-      onUpdate?.()
-    }
+        onUpdate?.()
+      }
   }
 
   const handleUpdateLine = async (id: string, updates: Partial<InvoiceLine>) => {
     const success = await updateInvoiceLine(id, updates)
     if (success) {
       setEditingId(null)
-      onUpdate?.()
+        onUpdate?.()
     }
   }
 
@@ -139,6 +143,14 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       if (result.success) {
         setInvoiceMessage({ type: 'success', text: result.message })
         console.log('✅ Facture créée avec succès via n8n')
+        
+        // Si un PDF a été généré, afficher le composant de téléchargement
+        if (result.pdfUrl) {
+          setPdfUrl(result.pdfUrl)
+          setPdfFileName(result.fileName)
+          setShowPDFDownload(true)
+          console.log('📄 PDF généré, affichage du composant de téléchargement')
+        }
       } else {
         setInvoiceMessage({ type: 'error', text: result.message })
         console.error('❌ Erreur lors de la création de la facture:', result.message)
@@ -212,8 +224,8 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
               <FileText className="w-4 h-4 mr-1" />
               {isCreatingInvoice ? 'Création...' : 'Créer Facture'}
             </button>
-          </div>
         </div>
+      </div>
 
       {/* Messages de succès/erreur */}
       {invoiceMessage && (
@@ -260,26 +272,26 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
                 Prix unitaire
               </label>
               <div className="relative">
-                <input
-                  type="number"
+              <input
+                type="number"
                   value={newLine.unit_price}
                   onChange={(e) => setNewLine(prev => ({ ...prev, unit_price: Number(e.target.value) || 0 }))}
-                  step="0.01"
-                  min="0"
+                step="0.01"
+                min="0"
                   className="w-full px-3 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="absolute right-3 top-2 text-sm text-gray-500">€</span>
-              </div>
             </div>
+          </div>
             <div className="flex space-x-2">
-              <button
+            <button
                 onClick={handleAddLine}
                 disabled={!newLine.description.trim()}
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
-              >
+            >
                 <Save className="w-4 h-4" />
-              </button>
-              <button
+            </button>
+            <button
                 onClick={() => {
                   setIsAdding(false)
                   setNewLine({ description: '', quantity: 1, unit_price: 0 })
@@ -287,10 +299,10 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors"
               >
                 <X className="w-4 h-4" />
-              </button>
-            </div>
+            </button>
           </div>
-        </div>
+                </div>
+              </div>
       )}
 
       {/* Tableau des lignes */}
@@ -359,7 +371,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
                           className="w-24 px-2 py-1 pr-6 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         />
                         <span className="absolute right-2 top-1 text-xs text-gray-500">€</span>
-                      </div>
+                </div>
                     ) : (
                       <span className="text-gray-900 dark:text-white">{formatCurrency(line.unit_price)}</span>
                     )}
@@ -380,25 +392,25 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
                           <Save className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button
+                <button
                           onClick={() => setEditingId(line.id)}
                           className="text-blue-600 hover:text-blue-800"
-                          title="Modifier"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                  title="Modifier"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
                       )}
-                      <button
+                <button
                         onClick={() => handleDeleteLine(line.id)}
                         className="text-red-600 hover:text-red-800"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  title="Supprimer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
                   </td>
                 </tr>
-              ))}
+          ))}
             </tbody>
           </table>
         </div>
@@ -408,6 +420,18 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
           <p className="text-sm mt-1">Cliquez sur "Ajouter" pour créer la première ligne</p>
         </div>
       )}
+
+      {/* Composant de téléchargement PDF */}
+      <InvoicePDFDownload
+        isVisible={showPDFDownload}
+        pdfUrl={pdfUrl}
+        fileName={pdfFileName}
+        onClose={() => {
+          setShowPDFDownload(false)
+          setPdfUrl(undefined)
+          setPdfFileName(undefined)
+        }}
+      />
     </div>
   )
 }
