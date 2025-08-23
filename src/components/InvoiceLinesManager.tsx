@@ -141,10 +141,21 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
         setInvoiceMessage({ type: 'success', text: result.message })
         
         // Si un PDF a été généré, afficher le composant de téléchargement
+        console.log('🔍 Vérification du PDF:', {
+          hasPdfBlob: !!result.pdfBlob,
+          pdfBlobType: result.pdfBlob?.type,
+          pdfBlobSize: result.pdfBlob?.size,
+          fileName: result.fileName
+        })
+        
         if (result.pdfBlob) {
+          console.log('✅ PDF détecté, mise à jour des états...')
           setPdfBlob(result.pdfBlob)
           setPdfFileName(result.fileName)
           setShowPDFDownload(true)
+          console.log('✅ États mis à jour - showPDFDownload:', true)
+        } else {
+          console.log('❌ Aucun PDF dans la réponse')
         }
       } else {
         setInvoiceMessage({ type: 'error', text: result.message })
