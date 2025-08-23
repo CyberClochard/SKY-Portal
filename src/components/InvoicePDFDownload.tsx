@@ -17,7 +17,6 @@ export const InvoicePDFDownload: React.FC<InvoicePDFDownloadProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false)
 
-
   if (!isVisible || !pdfBlob) {
     return null
   }
