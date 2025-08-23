@@ -146,11 +146,19 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
       console.log('📋 Données de facture préparées:', invoiceData)
 
       // Envoyer au webhook n8n
+      console.log('📤 Appel de sendInvoiceDataToWebhook...')
       const result = await sendInvoiceDataToWebhook(invoiceData)
+      console.log('📥 Résultat reçu de sendInvoiceDataToWebhook:', result)
 
       if (result.success) {
         setInvoiceMessage({ type: 'success', text: result.message })
         console.log('✅ Facture créée avec succès via n8n')
+        console.log('📄 Vérification du PDF:', {
+          hasPdfBlob: !!result.pdfBlob,
+          pdfBlobType: result.pdfBlob?.type,
+          pdfBlobSize: result.pdfBlob?.size,
+          fileName: result.fileName
+        })
         
         // Si un PDF a été généré, afficher le composant de téléchargement
         if (result.pdfBlob) {
@@ -162,6 +170,8 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
           console.log('📄 État showPDFDownload mis à true')
           console.log('📄 État pdfBlob mis à jour')
           console.log('📄 État pdfFileName mis à jour')
+        } else {
+          console.log('⚠️ Aucun PDF reçu dans la réponse')
         }
       } else {
         setInvoiceMessage({ type: 'error', text: result.message })
