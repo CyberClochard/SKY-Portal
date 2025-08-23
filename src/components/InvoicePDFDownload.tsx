@@ -17,9 +17,19 @@ export const InvoicePDFDownload: React.FC<InvoicePDFDownloadProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false)
 
+  console.log('🔍 InvoicePDFDownload - Props reçues:', {
+    isVisible,
+    hasPdfBlob: !!pdfBlob,
+    pdfBlobSize: pdfBlob?.size,
+    fileName
+  })
+
   if (!isVisible || !pdfBlob) {
+    console.log('🔍 InvoicePDFDownload - Composant masqué:', { isVisible, hasPdfBlob: !!pdfBlob })
     return null
   }
+
+  console.log('🔍 InvoicePDFDownload - Composant affiché avec succès')
 
   const handleDownload = () => {
     if (!pdfBlob) return

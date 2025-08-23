@@ -445,6 +445,17 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
           setPdfFileName(undefined)
         }}
       />
+
+      {/* Indicateur de débogage temporaire */}
+      {showPDFDownload && (
+        <div className="fixed top-4 right-4 bg-red-500 text-white p-2 rounded z-50">
+          🔴 DEBUG: Modal PDF activé
+          <br />
+          Blob: {pdfBlob ? `${pdfBlob.size} bytes` : 'undefined'}
+          <br />
+          File: {pdfFileName || 'undefined'}
+        </div>
+      )}
     </div>
   )
 }
