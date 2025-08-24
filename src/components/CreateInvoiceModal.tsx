@@ -1,398 +1,481 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { sendInvoiceDataToWebhook } from '../lib/supabase'
-import { X, FileText, Search, Loader2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader } from './ui/Card';
+import { sendInvoiceDataToWebhook } from '../lib/supabase';
+import { FileText, Truck, Calculator } from 'lucide-react';
 
 interface CreateInvoiceModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onSuccess?: () => void
+  isOpen: boolean;
+  onClose: () => void;
+  onInvoiceGenerated?: (pdfBlob: Blob, fileName: string) => void;
 }
 
-interface MasterRecord {
-  id: string
-  DOSSIER: string
-  CLIENT: string
-  DATE: string
-  STATUS: string
-  NETPAYABLE: string
+interface InvoiceData {
+  // Card 1: Informations de facturation
+  clientName: string;
+  clientAddress: string;
+  clientPostalCode: string;
+  clientCity: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  dossierNumber: string;
+  
+  // Card 2: Transport
+  ltaNumber: string;
+  packaging: string;
+  routing: string;
+  
+  // Card 3: Lignes de facturation
+  invoiceLines: InvoiceLine[];
 }
 
 interface InvoiceLine {
-  description: string
-  quantity: number
-  unit_price: number
-  total_price: number
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  tvaRate: number;
+  totalHT: number;
 }
 
-const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSuccess 
-}) => {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [masterRecords, setMasterRecords] = useState<MasterRecord[]>([])
-  const [loading, setLoading] = useState(false)
-  const [selectedDossier, setSelectedDossier] = useState<MasterRecord | null>(null)
-  const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([
-    { description: '', quantity: 1, unit_price: 0, total_price: 0 }
-  ])
-  const [creatingInvoice, setCreatingInvoice] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Charger les dossiers MASTER
-  useEffect(() => {
-    if (isOpen) {
-      loadMasterRecords()
-    }
-  }, [isOpen])
-
-  const loadMasterRecords = async () => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('MASTER')
-        .select('id, DOSSIER, CLIENT, DATE, STATUS, NETPAYABLE')
-        .order('DATE', { ascending: false })
-        .limit(100)
-
-      if (error) {
-        console.error('Erreur lors du chargement des dossiers:', error)
-        setMessage({ type: 'error', text: `Erreur lors du chargement: ${error.message}` })
-      } else {
-        setMasterRecords(data || [])
+const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose, onInvoiceGenerated }) => {
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>({
+    clientName: '',
+    clientAddress: '',
+    clientPostalCode: '',
+    clientCity: '',
+    invoiceNumber: '',
+    invoiceDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 jours
+    dossierNumber: '',
+    ltaNumber: '',
+    packaging: '',
+    routing: '',
+    invoiceLines: [
+      {
+        id: '1',
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        tvaRate: 20,
+        totalHT: 0
       }
-    } catch (err) {
-      console.error('Erreur chargement dossiers:', err)
-      setMessage({ type: 'error', text: 'Erreur lors du chargement des dossiers' })
-    } finally {
-      setLoading(false)
-    }
-  }
+    ]
+  });
 
-  // Filtrer les dossiers selon la recherche
-  const filteredRecords = masterRecords.filter(record =>
-    record.DOSSIER.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.CLIENT.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [message, setMessage] = useState('');
 
-  // Gérer les lignes de facturation
+  // Calculer le total HT automatiquement
+  const calculateTotalHT = (lines: InvoiceLine[]) => {
+    return lines.reduce((total, line) => total + line.totalHT, 0);
+  };
+
+  // Calculer le total TTC
+  const calculateTotalTTC = () => {
+    const totalHT = calculateTotalHT(invoiceData.invoiceLines);
+    const totalTVA = invoiceData.invoiceLines.reduce((total, line) => {
+      return total + (line.totalHT * line.tvaRate / 100);
+    }, 0);
+    return totalHT + totalTVA;
+  };
+
+  // Mettre à jour une ligne de facturation
+  const updateInvoiceLine = (id: string, field: keyof InvoiceLine, value: any) => {
+    setInvoiceData(prev => ({
+      ...prev,
+      invoiceLines: prev.invoiceLines.map(line => {
+        if (line.id === id) {
+          const updatedLine = { ...line, [field]: value };
+          // Recalculer le total HT
+          if (field === 'quantity' || field === 'unitPrice') {
+            updatedLine.totalHT = updatedLine.quantity * updatedLine.unitPrice;
+          }
+          return updatedLine;
+        }
+        return line;
+      })
+    }));
+  };
+
+  // Ajouter une nouvelle ligne
   const addInvoiceLine = () => {
-    setInvoiceLines([...invoiceLines, { description: '', quantity: 1, unit_price: 0, total_price: 0 }])
-  }
+    const newId = (invoiceData.invoiceLines.length + 1).toString();
+    setInvoiceData(prev => ({
+      ...prev,
+      invoiceLines: [
+        ...prev.invoiceLines,
+        {
+          id: newId,
+          description: '',
+          quantity: 1,
+          unitPrice: 0,
+          tvaRate: 20,
+          totalHT: 0
+        }
+      ]
+    }));
+  };
 
-  const removeInvoiceLine = (index: number) => {
-    if (invoiceLines.length > 1) {
-      setInvoiceLines(invoiceLines.filter((_, i) => i !== index))
+  // Supprimer une ligne
+  const removeInvoiceLine = (id: string) => {
+    if (invoiceData.invoiceLines.length > 1) {
+      setInvoiceData(prev => ({
+        ...prev,
+        invoiceLines: prev.invoiceLines.filter(line => line.id !== id)
+      }));
     }
-  }
+  };
 
-  const updateInvoiceLine = (index: number, field: keyof InvoiceLine, value: string | number) => {
-    const newLines = [...invoiceLines]
-    newLines[index] = { ...newLines[index], [field]: value }
-    
-    // Recalculer le total
-    if (field === 'quantity' || field === 'unit_price') {
-      const quantity = field === 'quantity' ? Number(value) : newLines[index].quantity
-      const unitPrice = field === 'unit_price' ? Number(value) : newLines[index].unit_price
-      newLines[index].total_price = quantity * unitPrice
-    }
-    
-    setInvoiceLines(newLines)
-  }
-
-  // Créer la facture
-  const handleCreateInvoice = async () => {
-    if (!selectedDossier) {
-      setMessage({ type: 'error', text: 'Veuillez sélectionner un dossier' })
-      return
+  // Valider et générer la facture
+  const handleGenerateInvoice = async () => {
+    // Validation basique
+    if (!invoiceData.clientName || !invoiceData.dossierNumber) {
+      setMessage('Veuillez remplir au minimum le nom du client et le numéro de dossier.');
+      return;
     }
 
-    if (invoiceLines.some(line => !line.description.trim() || line.unit_price <= 0)) {
-      setMessage({ type: 'error', text: 'Veuillez remplir toutes les lignes de facturation' })
-      return
+    if (invoiceData.invoiceLines.some(line => !line.description || line.unitPrice <= 0)) {
+      setMessage('Veuillez remplir toutes les lignes de facturation avec description et prix.');
+      return;
     }
 
-    setCreatingInvoice(true)
-    setMessage(null)
+    setIsGenerating(true);
+    setMessage('');
 
     try {
-      const totalAmount = invoiceLines.reduce((sum, line) => sum + line.total_price, 0)
-
-      const invoiceData = {
-        master_id: selectedDossier.id,
-        dossier_number: selectedDossier.DOSSIER,
-        client_name: selectedDossier.CLIENT,
-        invoice_lines: invoiceLines,
-        total_amount: totalAmount,
+      // Préparer les données pour le webhook selon l'interface attendue
+      const webhookData = {
+        master_id: invoiceData.dossierNumber,
+        dossier_number: invoiceData.dossierNumber,
+        client_name: invoiceData.clientName,
+        invoice_lines: invoiceData.invoiceLines.map(line => ({
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unitPrice,
+          total_price: line.totalHT
+        })),
+        total_amount: calculateTotalTTC(),
         created_at: new Date().toISOString(),
         source: 'SkyLogistics WebApp - Modal Création'
-      }
+      };
 
-      console.log('📋 Données de facture préparées:', invoiceData)
-
-      const result = await sendInvoiceDataToWebhook(invoiceData)
-
-      if (result.success) {
-        setMessage({ type: 'success', text: result.message })
-        console.log('✅ Facture créée avec succès via n8n')
-        
-        // Réinitialiser le formulaire
-        setTimeout(() => {
-          setSelectedDossier(null)
-          setInvoiceLines([{ description: '', quantity: 1, unit_price: 0, total_price: 0 }])
-          setMessage(null)
-          onSuccess?.()
-          onClose()
-        }, 2000)
+      const result = await sendInvoiceDataToWebhook(webhookData);
+      
+      if (result.success && result.pdfBlob) {
+        // Notifier le composant parent de la génération réussie
+        if (onInvoiceGenerated) {
+          onInvoiceGenerated(result.pdfBlob, result.fileName || `facture_${invoiceData.dossierNumber}.pdf`);
+        }
+        // Fermer ce modal
+        onClose();
       } else {
-        setMessage({ type: 'error', text: result.message })
+        setMessage(`Erreur lors de la génération: ${result.message || 'Erreur inconnue'}`);
       }
-
     } catch (error) {
-      console.error('❌ Erreur lors de la création de la facture:', error)
-      setMessage({ 
-        type: 'error', 
-        text: `Erreur lors de la création: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
-      })
+      setMessage(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
-      setCreatingInvoice(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Créer une nouvelle facture
-          </h2>
+      <div className="bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Créer une facture</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="text-gray-500 hover:text-gray-700 text-xl"
           >
-            <X className="w-6 h-6" />
+            ×
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Sélection du dossier */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
-              Sélectionner un dossier
-            </h3>
-            
-            {/* Recherche */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Rechercher par numéro de dossier ou client..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            {/* Liste des dossiers */}
-            <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg">
-              {loading ? (
-                <div className="flex items-center justify-center p-4">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">Chargement...</span>
-                </div>
-              ) : filteredRecords.length === 0 ? (
-                <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                  Aucun dossier trouvé
-                </div>
-              ) : (
-                filteredRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    onClick={() => setSelectedDossier(record)}
-                    className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-600 last:border-b-0 ${
-                      selectedDossier?.id === record.id 
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' 
-                        : ''
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {record.DOSSIER}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {record.CLIENT}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(record.DATE).toLocaleDateString('fr-FR')}
-                        </div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {record.STATUS}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Dossier sélectionné */}
-          {selectedDossier && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                Dossier sélectionné
-              </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-700 dark:text-blue-300">Numéro:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-100 font-medium">
-                    {selectedDossier.DOSSIER}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-blue-700 dark:text-blue-300">Client:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-100 font-medium">
-                    {selectedDossier.CLIENT}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-blue-700 dark:text-blue-300">Date:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-100">
-                    {new Date(selectedDossier.DATE).toLocaleDateString('fr-FR')}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-blue-700 dark:text-blue-300">Statut:</span>
-                  <span className="ml-2 text-blue-900 dark:text-blue-100">
-                    {selectedDossier.STATUS}
-                  </span>
-                </div>
+        {/* Card 1: Informations de facturation */}
+        <Card className="mb-6">
+          <CardHeader icon={<FileText className="w-5 h-5 text-blue-600" />} title="Informations de facturation" />
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom du client *
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.clientName}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, clientName: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nom du client"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  N° de dossier *
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.dossierNumber}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, dossierNumber: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="AE25/0880"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Adresse du client
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.clientAddress}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, clientAddress: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Adresse complète"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Code postal
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.clientPostalCode}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, clientPostalCode: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="75001"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ville
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.clientCity}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, clientCity: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Paris"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  N° de facture
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.invoiceNumber}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, invoiceNumber: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="FAC-2024-001"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date de facture
+                </label>
+                <input
+                  type="date"
+                  value={invoiceData.invoiceDate}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, invoiceDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date d'échéance
+                </label>
+                <input
+                  type="date"
+                  value={invoiceData.dueDate}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
-          )}
+          </CardContent>
+        </Card>
 
-          {/* Lignes de facturation */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Lignes de facturation
-              </h3>
-              <button
-                onClick={addInvoiceLine}
-                className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-              >
-                + Ajouter une ligne
-              </button>
+        {/* Card 2: Transport */}
+        <Card className="mb-6">
+          <CardHeader icon={<Truck className="w-5 h-5 text-green-600" />} title="Transport" />
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  N° LTA
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.ltaNumber}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, ltaNumber: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Numéro LTA"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Colisage
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.packaging}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, packaging: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type de colisage"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Routing
+                </label>
+                <input
+                  type="text"
+                  value={invoiceData.routing}
+                  onChange={(e) => setInvoiceData(prev => ({ ...prev, routing: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Itinéraire"
+                />
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-3">
-              {invoiceLines.map((line, index) => (
-                <div key={index} className="grid grid-cols-12 gap-3 items-center">
-                  <div className="col-span-5">
+        {/* Card 3: Lignes de facturation */}
+        <Card className="mb-6">
+          <CardHeader icon={<Calculator className="w-5 h-5 text-purple-600" />} title="Lignes de facturation" />
+          <CardContent>
+            <div className="space-y-4">
+              {invoiceData.invoiceLines.map((line, index) => (
+                <div key={line.id} className="grid grid-cols-6 gap-3 items-end border-b pb-3">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description article {index + 1}
+                    </label>
                     <input
                       type="text"
-                      placeholder="Description de la prestation"
                       value={line.description}
-                      onChange={(e) => updateInvoiceLine(index, 'description', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      onChange={(e) => updateInvoiceLine(line.id, 'description', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Description de l'article"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Qté
+                    </label>
                     <input
                       type="number"
-                      placeholder="Qté"
-                      value={line.quantity}
-                      onChange={(e) => updateInvoiceLine(index, 'quantity', Number(e.target.value) || 1)}
                       min="1"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      value={line.quantity}
+                      onChange={(e) => updateInvoiceLine(line.id, 'quantity', parseInt(e.target.value) || 1)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prix unit HT
+                    </label>
                     <input
                       type="number"
-                      placeholder="Prix unit."
-                      value={line.unit_price}
-                      onChange={(e) => updateInvoiceLine(index, 'unit_price', Number(e.target.value) || 0)}
-                      step="0.01"
                       min="0"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      step="0.01"
+                      value={line.unitPrice}
+                      onChange={(e) => updateInvoiceLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <div className="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white rounded-md text-right font-medium">
-                      {line.total_price.toFixed(2)} €
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      TVA (%)
+                    </label>
+                    <select
+                      value={line.tvaRate}
+                      onChange={(e) => updateInvoiceLine(line.id, 'tvaRate', parseFloat(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value={0}>0%</option>
+                      <option value={5.5}>5.5%</option>
+                      <option value={10}>10%</option>
+                      <option value={20}>20%</option>
+                    </select>
                   </div>
-                  <div className="col-span-1">
-                    {invoiceLines.length > 1 && (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Total HT
+                      </label>
+                      <div className="px-3 py-2 bg-gray-100 rounded-md text-sm">
+                        {line.totalHT.toFixed(2)} €
+                      </div>
+                    </div>
+                    {invoiceData.invoiceLines.length > 1 && (
                       <button
-                        onClick={() => removeInvoiceLine(index)}
-                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                        onClick={() => removeInvoiceLine(line.id)}
+                        className="px-2 py-1 text-red-600 hover:text-red-800 text-sm"
                       >
-                        <X className="w-4 h-4" />
+                        ×
                       </button>
                     )}
                   </div>
                 </div>
               ))}
+              
+              <button
+                onClick={addInvoiceLine}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                + Ajouter une ligne
+              </button>
             </div>
 
-            {/* Total */}
-            <div className="mt-4 text-right">
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                Total: {invoiceLines.reduce((sum, line) => sum + line.total_price, 0).toFixed(2)} €
+            {/* Totaux */}
+            <div className="mt-6 pt-4 border-t">
+              <div className="flex justify-end space-x-8">
+                <div className="text-right">
+                  <div className="text-sm text-gray-600">Total HT</div>
+                  <div className="text-lg font-semibold">{calculateTotalHT(invoiceData.invoiceLines).toFixed(2)} €</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-600">Total TTC</div>
+                  <div className="text-lg font-semibold">{calculateTotalTTC().toFixed(2)} €</div>
+                </div>
               </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Messages */}
-          {message && (
-            <div className={`p-3 rounded-md ${
-              message.type === 'success' 
-                ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
-                : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400'
-            }`}>
-              {message.text}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={handleCreateInvoice}
-              disabled={!selectedDossier || creatingInvoice || invoiceLines.some(line => !line.description.trim() || line.unit_price <= 0)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md flex items-center"
-            >
-              {creatingInvoice ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Création...
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Créer la facture
-                </>
-              )}
-            </button>
+        {/* Message d'erreur/succès */}
+        {message && (
+          <div className={`mb-4 p-3 rounded-md ${
+            message.includes('Erreur') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          }`}>
+            {message}
           </div>
+        )}
+
+        {/* Boutons d'action */}
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleGenerateInvoice}
+            disabled={isGenerating}
+            className={`px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${
+              isGenerating ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            {isGenerating ? 'Génération...' : 'Valider et générer la facture'}
+          </button>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default CreateInvoiceModal
+export default CreateInvoiceModal;

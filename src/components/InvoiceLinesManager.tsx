@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Save, X, FileText } from 'lucide-react'
 import { useInvoiceLines, InvoiceLine } from '../hooks/useInvoiceLines'
 import { sendInvoiceDataToWebhook, testWebhookConnectivity } from '../lib/supabase'
-import { InvoicePDFDownload } from './InvoicePDFDownload'
+import { InvoicePDFDownload } from './InvoicePDFDownload';
 
 interface InvoiceLinesManagerProps {
   masterId: string
@@ -421,7 +421,7 @@ export const InvoiceLinesManager: React.FC<InvoiceLinesManagerProps> = ({
           ))}
             </tbody>
           </table>
-        </div>
+            </div>
       ) : (
         <div className="text-center py-8 text-gray-500">
           <p>Aucune ligne de facturation</p>
