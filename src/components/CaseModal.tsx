@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import UnifiedOverrideControl from './UnifiedOverrideControl'
 import FinanceNotesCard from './FinanceNotesCard'
 import { InvoiceLinesManager } from './InvoiceLinesManager'
+import CreateInvoiceModal from './CreateInvoiceModal'
+import { fetchDossierData } from '../lib/supabase'
 
 
 // Types pour les templates
@@ -186,8 +188,31 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
   const [initialAchatsReels, setInitialAchatsReels] = useState<LigneAchat[]>([])
   const [initialReglements, setInitialReglements] = useState<Reglement[]>([])
   const [isManualMode, setIsManualMode] = useState(false)
+  
+  // États pour le modal de création de facture
+  const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false)
+  const [showPDFDownload, setShowPDFDownload] = useState(false)
+  const [pdfBlob, setPdfBlob] = useState<Blob | undefined>(undefined)
+  const [pdfFileName, setPdfFileName] = useState('')
+  
+  // États pour les données du dossier récupérées
+  const [dossierData, setDossierData] = useState<any>(null)
+  const [isLoadingDossierData, setIsLoadingDossierData] = useState(false)
+  
+  // États pour la sélection de clients
+  const [customers, setCustomers] = useState<{ name: string }[]>([])
+  const [filteredCustomers, setFilteredCustomers] = useState<{ name: string }[]>([])
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false)
+  const [selectedCustomerIndex, setSelectedCustomerIndex] = useState<number>(-1)
 
 
+
+  // Callback pour gérer la facture générée
+  const handleInvoiceGenerated = (pdfBlob: Blob, fileName: string) => {
+    setPdfBlob(pdfBlob)
+    setPdfFileName(fileName)
+    setShowPDFDownload(true)
+  }
 
   // Configuration des onglets
   const tabs = [
@@ -261,6 +286,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
   useEffect(() => {
     if (isOpen && dossier) {
       loadCaseData()
+      loadCustomers()
     }
   }, [isOpen, dossier])
 
@@ -363,6 +389,29 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
       setError('Erreur de connexion à la base de données')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Charger la liste des clients
+  const loadCustomers = async () => {
+    try {
+      console.log('Loading customers...')
+      
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('name')
+        .order('name', { ascending: true })
+
+      if (customersError) {
+        console.error('Error loading customers:', customersError)
+        return
+      }
+
+      console.log('Customers loaded:', customersData?.length || 0, 'customers')
+      setCustomers(customersData || [])
+      setFilteredCustomers(customersData || [])
+    } catch (err) {
+      console.error('Failed to load customers:', err)
     }
   }
 
@@ -717,33 +766,148 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
   const FormField: React.FC<FormFieldProps> = ({
     label, value, onChange, type = 'text', readOnly = false, 
     fullWidth = false, unit, placeholder
-  }) => (
-    <div className={fullWidth ? 'col-span-full' : ''}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          type={type}
-          value={value || ''}
-          onChange={(e) => onChange?.(e.target.value)}
-          readOnly={readOnly}
-          placeholder={placeholder}
-          className={`
-            w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
-            rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            ${readOnly ? 'bg-gray-50 dark:bg-gray-700 text-gray-500' : 'bg-white dark:bg-gray-800'}
-            dark:text-white
-          `}
-        />
-        {unit && (
-          <span className="absolute right-3 top-2 text-sm text-gray-500">
-            {unit}
-          </span>
-        )}
+  }) => {
+    // Gestion spéciale pour le champ CLIENT
+    if (label === 'Client' && !readOnly) {
+      return (
+        <div className={fullWidth ? 'col-span-full' : ''}>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {label}
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={value || ''}
+              onChange={(e) => {
+                const inputValue = e.target.value
+                onChange?.(inputValue)
+                // Filtrer les suggestions
+                if (inputValue) {
+                  setFilteredCustomers(customers.filter(c => 
+                    c.name.toLowerCase().includes(inputValue.toLowerCase())
+                  ))
+                } else {
+                  setFilteredCustomers(customers)
+                }
+                setSelectedCustomerIndex(-1)
+              }}
+              onFocus={() => {
+                setShowCustomerSuggestions(true)
+                // Si il y a déjà une valeur, appliquer le filtre
+                if (value) {
+                  setFilteredCustomers(customers.filter(c => 
+                    c.name.toLowerCase().includes(value.toLowerCase())
+                  ))
+                } else {
+                  setFilteredCustomers(customers)
+                }
+                setSelectedCustomerIndex(-1)
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowCustomerSuggestions(false), 200)
+              }}
+              onKeyDown={(e) => {
+                if (!showCustomerSuggestions || filteredCustomers.length === 0) return
+                
+                switch (e.key) {
+                  case 'ArrowDown':
+                    e.preventDefault()
+                    setSelectedCustomerIndex(prev => 
+                      prev < filteredCustomers.length - 1 ? prev + 1 : 0
+                    )
+                    break
+                  case 'ArrowUp':
+                    e.preventDefault()
+                    setSelectedCustomerIndex(prev => 
+                      prev > 0 ? prev - 1 : filteredCustomers.length - 1
+                    )
+                    break
+                  case 'Enter':
+                    e.preventDefault()
+                    if (selectedCustomerIndex >= 0 && selectedCustomerIndex < filteredCustomers.length) {
+                      const selectedCustomer = filteredCustomers[selectedCustomerIndex]
+                      onChange?.(selectedCustomer.name)
+                      setShowCustomerSuggestions(false)
+                      setSelectedCustomerIndex(-1)
+                    }
+                    break
+                  case 'Escape':
+                    e.preventDefault()
+                    setShowCustomerSuggestions(false)
+                    setSelectedCustomerIndex(-1)
+                    break
+                }
+              }}
+              placeholder="Tapez pour rechercher un client..."
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-white"
+            />
+            
+            {/* Suggestions de clients */}
+            {showCustomerSuggestions && filteredCustomers.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {filteredCustomers.map((customer, index) => (
+                  <button
+                    key={customer.name}
+                    type="button"
+                    onClick={() => {
+                      onChange?.(customer.name)
+                      setShowCustomerSuggestions(false)
+                      setSelectedCustomerIndex(-1)
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                      index === selectedCustomerIndex
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                        : 'text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {customer.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {/* Message si aucun client trouvé */}
+            {showCustomerSuggestions && value && filteredCustomers.length === 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Aucun client trouvé avec "{value}"
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    // Rendu normal pour les autres champs
+    return (
+      <div className={fullWidth ? 'col-span-full' : ''}>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          {label}
+        </label>
+        <div className="relative">
+          <input
+            type={type}
+            value={value || ''}
+            onChange={(e) => onChange?.(e.target.value)}
+            readOnly={readOnly}
+            placeholder={placeholder}
+            className={`
+              w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+              rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+              ${readOnly ? 'bg-gray-50 dark:bg-gray-700 text-gray-500' : 'bg-white dark:bg-gray-800'}
+              dark:text-white
+            `}
+          />
+          {unit && (
+            <span className="absolute right-3 top-2 text-sm text-gray-500">
+              {unit}
+            </span>
+          )}
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   const ModeSelector: React.FC<ModeSelectorProps> = ({ value, onChange, options }) => (
     <div className="flex space-x-2">
@@ -1314,7 +1478,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
               <FormField 
                 label="Client" 
                 value={editingData.CLIENT || caseData.CLIENT} 
-                readOnly 
+                onChange={(value) => handleFieldChange('CLIENT', value)}
               />
               <FormField 
                 label="N° Dossier" 
@@ -1466,7 +1630,54 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
         
         {/* Card 1: Ventes (pleine largeur) */}
         <Card>
-          <CardHeader icon={<Euro className="w-5 h-5" />} title="Ventes - Lignes de facturation" />
+          <CardHeader 
+            icon={<Euro className="w-5 h-5" />} 
+            title="Ventes - Lignes de facturation"
+            actions={
+              <button
+                onClick={async () => {
+                  setIsLoadingDossierData(true)
+                  try {
+                    console.log('🔄 Récupération des données du dossier avant ouverture du modal...')
+                    const result = await fetchDossierData(dossier)
+                    
+                    if (result.success && result.data) {
+                      console.log('✅ Données du dossier récupérées:', result.data)
+                      setDossierData(result.data)
+                      setIsCreateInvoiceModalOpen(true)
+                    } else {
+                      console.error('❌ Erreur lors de la récupération des données:', result.message)
+                      alert(`Erreur lors de la récupération des données du dossier: ${result.message}`)
+                    }
+                  } catch (error) {
+                    console.error('❌ Erreur inattendue:', error)
+                    alert('Erreur inattendue lors de la récupération des données du dossier')
+                  } finally {
+                    setIsLoadingDossierData(false)
+                  }
+                }}
+                disabled={isLoadingDossierData}
+                className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
+                  isLoadingDossierData 
+                    ? 'bg-green-400 cursor-not-allowed' 
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+                title="Créer une facture pour ce dossier"
+              >
+                {isLoadingDossierData ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 mr-1 border-b-2 border-white"></div>
+                    Chargement...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-1" />
+                    Créer Facture
+                  </>
+                )}
+              </button>
+            }
+          />
           <CardContent>
             <InvoiceLinesManager 
               masterId={dossier}
@@ -1995,6 +2206,88 @@ const CaseModal: React.FC<CaseModalProps> = ({ isOpen, dossier, onClose }) => {
             </>
           )}
         </div>
+
+        {/* Modals */}
+        {/* Create Invoice Modal */}
+        <CreateInvoiceModal
+          isOpen={isCreateInvoiceModalOpen}
+          onClose={() => setIsCreateInvoiceModalOpen(false)}
+          onInvoiceGenerated={handleInvoiceGenerated}
+          dossierData={dossierData}
+        />
+
+        {/* PDF Download Modal */}
+        {showPDFDownload && pdfBlob && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl mx-4 p-6">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-10 h-10 text-green-600" />
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Facture générée avec succès !
+                  </h3>
+                  <p className="text-gray-600 mt-1">
+                    Votre facture PDF a été créée par le workflow n8n
+                  </p>
+                </div>
+
+                {pdfFileName && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600">Nom du fichier :</p>
+                    <p className="font-mono text-sm text-gray-800">{pdfFileName}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    if (pdfBlob) {
+                      const url = window.URL.createObjectURL(pdfBlob)
+                      window.open(url, '_blank')
+                      setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  <span>Voir le PDF</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (pdfBlob) {
+                      const url = window.URL.createObjectURL(pdfBlob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = pdfFileName || `facture_${dossier}.pdf`
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                      window.URL.revokeObjectURL(url)
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                >
+                  <span>Télécharger</span>
+                </button>
+              </div>
+
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => setShowPDFDownload(false)}
+                  className="text-gray-500 hover:text-gray-700 text-sm transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -7,6 +7,7 @@ interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onInvoiceGenerated?: (pdfBlob: Blob, fileName: string) => void;
+  dossierData?: any; // Données du dossier récupérées du webhook
 }
 
 interface InvoiceData {
@@ -38,7 +39,7 @@ interface InvoiceLine {
   totalHT: number;
 }
 
-const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose, onInvoiceGenerated }) => {
+const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose, onInvoiceGenerated, dossierData }) => {
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     clientName: '',
     clientAddress: '',
@@ -65,6 +66,56 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Pré-remplir les champs quand les données du dossier sont reçues
+  useEffect(() => {
+    if (dossierData) {
+      console.log('🔄 Pré-remplissage des champs avec les données du dossier:', dossierData)
+      
+      // Extraire les informations principales du premier objet
+      const mainData = dossierData[0] || dossierData;
+      
+      // Extraire les lignes de facturation (objets avec lines_*)
+      const invoiceLines = dossierData.filter((item: any) => 
+        item.lines_description && item.lines_quantity && item.lines_unit_price
+      );
+      
+      setInvoiceData(prev => ({
+        ...prev,
+        // Card 1: Informations de facturation
+        clientName: mainData.client_name || prev.clientName,
+        clientAddress: mainData.client_adresse || prev.clientAddress,
+        clientCity: mainData.client_city || prev.clientCity,
+        dossierNumber: mainData.master_id || prev.dossierNumber,
+        
+        // Card 2: Transport
+        ltaNumber: mainData.lta || prev.ltaNumber,
+        packaging: mainData.hum_name || prev.packaging, // hum_name = nom du chauffeur/colisageur
+        routing: mainData.routing || prev.routing,
+        // Pré-remplir les lignes de facturation si disponibles
+        invoiceLines: invoiceLines.length > 0 ? 
+          invoiceLines.map((line: any, index: number) => ({
+            id: (index + 1).toString(),
+            description: line.lines_description || '',
+            quantity: parseInt(line.lines_quantity) || 1,
+            unitPrice: parseFloat(line.lines_unit_price) || 0,
+            tvaRate: 20, // Valeur par défaut
+            totalHT: parseFloat(line.lines_total_price) || 0
+          })) : prev.invoiceLines
+      }))
+      
+      console.log('✅ Champs pré-remplis:', {
+        clientName: mainData.client_name,
+        clientAddress: mainData.client_adresse,
+        clientCity: mainData.client_city,
+        dossierNumber: mainData.master_id,
+        ltaNumber: mainData.lta,
+        packaging: mainData.hum_name,
+        routing: mainData.routing,
+        linesCount: invoiceLines.length
+      })
+    }
+  }, [dossierData]);
 
   // Calculer le total HT automatiquement
   const calculateTotalHT = (lines: InvoiceLine[]) => {
@@ -183,12 +234,12 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Créer une facture</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Créer une facture</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
           >
             ×
           </button>

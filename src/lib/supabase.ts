@@ -858,3 +858,47 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     }
   }
 }
+
+// Function to fetch dossier data from n8n webhook
+export const fetchDossierData = async (masterId: string): Promise<{ success: boolean; data?: any; message: string }> => {
+  const webhookUrl = 'https://n8n.skylogistics.fr/webhook/d42dfb71-a582-467b-8953-cd4d0d1c1902'
+  
+  try {
+    console.log('📤 Récupération des données du dossier:', masterId)
+    console.log('🔗 URL du webhook:', webhookUrl)
+    
+    // Appel simple et direct
+    const url = `${webhookUrl}?master_id=${encodeURIComponent(masterId)}`
+    console.log('🔄 Appel vers:', url)
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    })
+    
+    console.log('📥 Statut de la réponse:', response.status, response.statusText)
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
+    }
+    
+    const responseData = await response.json()
+    console.log('✅ Données récupérées:', responseData)
+    
+    return {
+      success: true,
+      data: responseData,
+      message: 'Données du dossier récupérées avec succès'
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur:', error)
+    
+    return {
+      success: false,
+      message: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+    }
+  }
+}

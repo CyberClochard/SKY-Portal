@@ -22,11 +22,20 @@ export default defineConfig({
           });
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('Sending Request to the Target:', req.method, req.url);
+            // Log des paramètres de requête
+            if (req.url) {
+              console.log('Original URL:', req.url);
+              console.log('Rewritten URL:', proxyReq.path);
+            }
           });
           proxy.on('proxyRes', (proxyRes, req, res) => {
             console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+            console.log('Response Headers:', proxyRes.headers);
           });
         },
+        // Ajouter des options pour mieux gérer les paramètres
+        secure: true,
+        timeout: 30000,
       },
     },
   },

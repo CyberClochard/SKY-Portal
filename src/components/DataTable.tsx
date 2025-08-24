@@ -17,6 +17,10 @@ interface NewDossierFormData {
   [key: string]: any
 }
 
+interface Customer {
+  name: string
+}
+
 const DataTable: React.FC = () => {
   const [data, setData] = useState<MasterRecord[]>([])
   const [filteredData, setFilteredData] = useState<MasterRecord[]>([])
@@ -46,10 +50,16 @@ const DataTable: React.FC = () => {
     TYPE: 'HUM',
   })
   const [creatingDossier, setCreatingDossier] = useState(false)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loadingCustomers, setLoadingCustomers] = useState(false)
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([])
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false)
+  const [selectedCustomerIndex, setSelectedCustomerIndex] = useState<number>(-1)
 
   // Load data from Supabase MASTER table
   useEffect(() => {
     loadMasterData()
+    loadCustomers()
   }, [])
 
   const loadMasterData = async () => {
@@ -95,6 +105,32 @@ const DataTable: React.FC = () => {
       setError('Erreur de connexion à la base de données')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Load customers from Supabase customers table
+  const loadCustomers = async () => {
+    try {
+      setLoadingCustomers(true)
+      console.log('Loading customers...')
+      
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('name')
+        .order('name', { ascending: true })
+
+      if (customersError) {
+        console.error('Error loading customers:', customersError)
+        return
+      }
+
+      console.log('Customers loaded:', customersData?.length || 0, 'customers')
+      setCustomers(customersData || [])
+      setFilteredCustomers(customersData || [])
+    } catch (err) {
+      console.error('Failed to load customers:', err)
+    } finally {
+      setLoadingCustomers(false)
     }
   }
 
@@ -444,6 +480,11 @@ const DataTable: React.FC = () => {
       }
     }
     
+    // For CLIENT column, the value is already the customer name
+    if (columnName === 'CLIENT') {
+      return value || '-'
+    }
+    
     return value.toString()
   }
 
@@ -560,17 +601,120 @@ const DataTable: React.FC = () => {
                   />
                 </div>
 
-                <div>
+                                <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Client *
                   </label>
-                  <input
-                    type="text"
-                    value={newDossierData.CLIENT}
-                    onChange={(e) => handleNewDossierChange('CLIENT', e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nom du client"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={newDossierData.CLIENT}
+                                             onChange={(e) => {
+                         const value = e.target.value
+                         handleNewDossierChange('CLIENT', value)
+                         // Si l'utilisateur tape quelque chose, on peut filtrer les suggestions
+                         if (value) {
+                           setFilteredCustomers(customers.filter(c => 
+                             c.name.toLowerCase().includes(value.toLowerCase())
+                           ))
+                         } else {
+                           setFilteredCustomers(customers)
+                         }
+                         // Réinitialiser l'index sélectionné quand l'utilisateur tape
+                         setSelectedCustomerIndex(-1)
+                       }}
+                                             onFocus={() => {
+                         setShowCustomerSuggestions(true)
+                         // Si il y a déjà une valeur, appliquer le filtre
+                         if (newDossierData.CLIENT) {
+                           setFilteredCustomers(customers.filter(c => 
+                             c.name.toLowerCase().includes(newDossierData.CLIENT.toLowerCase())
+                           ))
+                         } else {
+                           setFilteredCustomers(customers)
+                         }
+                         setSelectedCustomerIndex(-1)
+                       }}
+                                             onBlur={() => {
+                         // Délai pour permettre le clic sur une suggestion
+                         setTimeout(() => setShowCustomerSuggestions(false), 200)
+                       }}
+                       onKeyDown={(e) => {
+                         if (!showCustomerSuggestions || filteredCustomers.length === 0) return
+                         
+                         switch (e.key) {
+                           case 'ArrowDown':
+                             e.preventDefault()
+                             setSelectedCustomerIndex(prev => 
+                               prev < filteredCustomers.length - 1 ? prev + 1 : 0
+                             )
+                             break
+                           case 'ArrowUp':
+                             e.preventDefault()
+                             setSelectedCustomerIndex(prev => 
+                               prev > 0 ? prev - 1 : filteredCustomers.length - 1
+                             )
+                             break
+                           case 'Enter':
+                             e.preventDefault()
+                             if (selectedCustomerIndex >= 0 && selectedCustomerIndex < filteredCustomers.length) {
+                               const selectedCustomer = filteredCustomers[selectedCustomerIndex]
+                               handleNewDossierChange('CLIENT', selectedCustomer.name)
+                               setShowCustomerSuggestions(false)
+                               setSelectedCustomerIndex(-1)
+                             }
+                             break
+                           case 'Escape':
+                             e.preventDefault()
+                             setShowCustomerSuggestions(false)
+                             setSelectedCustomerIndex(-1)
+                             break
+                         }
+                       }}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Tapez pour rechercher un client..."
+                      disabled={loadingCustomers}
+                    />
+                    
+                                         {/* Suggestions de clients */}
+                     {showCustomerSuggestions && filteredCustomers.length > 0 && (
+                       <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                         {filteredCustomers.map((customer, index) => (
+                           <button
+                             key={customer.name}
+                             type="button"
+                             onClick={() => {
+                               handleNewDossierChange('CLIENT', customer.name)
+                               setShowCustomerSuggestions(false)
+                               setSelectedCustomerIndex(-1)
+                             }}
+                             className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                               index === selectedCustomerIndex
+                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                                 : 'text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
+                             }`}
+                           >
+                             {customer.name}
+                           </button>
+                         ))}
+                       </div>
+                     )}
+                    
+                    {/* Message si aucun client trouvé */}
+                    {showCustomerSuggestions && newDossierData.CLIENT && filteredCustomers.length === 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Aucun client trouvé avec "{newDossierData.CLIENT}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {loadingCustomers && (
+                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Chargement des clients...
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -866,14 +1010,118 @@ const DataTable: React.FC = () => {
                           </td>
                           {visibleColumnsArray.map((column) => (
                             <td key={column} className="px-6 py-4 whitespace-nowrap">
-                              {isEditing ? (
-                                <input
-                                  type="text"
-                                  value={editingData[column] || ''}
-                                  onChange={(e) => handleEditFieldChange(column, e.target.value)}
-                                  className="w-full px-2 py-1 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              ) : (
+                                                             {isEditing ? (
+                                 column === 'CLIENT' ? (
+                                   <div className="relative">
+                                     <input
+                                       type="text"
+                                       value={editingData[column] || ''}
+                                       onChange={(e) => {
+                                         const value = e.target.value
+                                         handleEditFieldChange(column, value)
+                                         // Filtrer les suggestions
+                                         if (value) {
+                                           setFilteredCustomers(customers.filter(c => 
+                                             c.name.toLowerCase().includes(value.toLowerCase())
+                                           ))
+                                         } else {
+                                           setFilteredCustomers(customers)
+                                         }
+                                         setSelectedCustomerIndex(-1)
+                                       }}
+                                       onFocus={() => {
+                                         setShowCustomerSuggestions(true)
+                                         // Si il y a déjà une valeur, appliquer le filtre
+                                         if (editingData[column]) {
+                                           setFilteredCustomers(customers.filter(c => 
+                                             c.name.toLowerCase().includes(editingData[column].toLowerCase())
+                                           ))
+                                         } else {
+                                           setFilteredCustomers(customers)
+                                         }
+                                         setSelectedCustomerIndex(-1)
+                                       }}
+                                       onBlur={() => {
+                                         setTimeout(() => setShowCustomerSuggestions(false), 200)
+                                       }}
+                                       onKeyDown={(e) => {
+                                         if (!showCustomerSuggestions || filteredCustomers.length === 0) return
+                                         
+                                         switch (e.key) {
+                                           case 'ArrowDown':
+                                             e.preventDefault()
+                                             setSelectedCustomerIndex(prev => 
+                                               prev < filteredCustomers.length - 1 ? prev + 1 : 0
+                                             )
+                                             break
+                                           case 'ArrowUp':
+                                             e.preventDefault()
+                                             setSelectedCustomerIndex(prev => 
+                                               prev > 0 ? prev - 1 : filteredCustomers.length - 1
+                                             )
+                                             break
+                                           case 'Enter':
+                                             e.preventDefault()
+                                             if (selectedCustomerIndex >= 0 && selectedCustomerIndex < filteredCustomers.length) {
+                                               const selectedCustomer = filteredCustomers[selectedCustomerIndex]
+                                               handleEditFieldChange(column, selectedCustomer.name)
+                                               setShowCustomerSuggestions(false)
+                                               setSelectedCustomerIndex(-1)
+                                             }
+                                             break
+                                           case 'Escape':
+                                             e.preventDefault()
+                                             setShowCustomerSuggestions(false)
+                                             setSelectedCustomerIndex(-1)
+                                             break
+                                         }
+                                       }}
+                                       className="w-full px-2 py-1 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="Tapez pour rechercher un client..."
+                                     />
+                                     
+                                     {/* Suggestions de clients pour l'édition */}
+                                     {showCustomerSuggestions && filteredCustomers.length > 0 && (
+                                       <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-32 overflow-y-auto">
+                                         {filteredCustomers.map((customer, index) => (
+                                           <button
+                                             key={customer.name}
+                                             type="button"
+                                             onClick={() => {
+                                               handleEditFieldChange(column, customer.name)
+                                               setShowCustomerSuggestions(false)
+                                               setSelectedCustomerIndex(-1)
+                                             }}
+                                             className={`w-full px-2 py-1 text-left text-xs transition-colors ${
+                                               index === selectedCustomerIndex
+                                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                                                 : 'text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
+                                             }`}
+                                           >
+                                             {customer.name}
+                                           </button>
+                                         ))}
+                                       </div>
+                                     )}
+                                     
+                                     {/* Message si aucun client trouvé */}
+                                     {showCustomerSuggestions && editingData[column] && filteredCustomers.length === 0 && (
+                                       <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-2">
+                                         <p className="text-xs text-gray-500 dark:text-gray-400">
+                                           Aucun client trouvé avec "{editingData[column]}"
+                                         </p>
+                                       </div>
+                                     )}
+                                   </div>
+                                 ) : (
+                                   <input
+                                     type="text"
+                                     value={editingData[column] || ''}
+                                     onChange={(e) => handleEditFieldChange(column, e.target.value)}
+                                     className="w-full px-2 py-1 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   />
+                                 )
+                               ) : (
                                 <div className={`text-sm ${
                                   column === 'DOSSIER' ? 'font-medium text-gray-900 dark:text-white' :
                                   column === 'DATE' || column === 'DATE2' ? 'text-gray-900 dark:text-white font-mono' :
