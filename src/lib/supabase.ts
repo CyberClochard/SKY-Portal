@@ -652,16 +652,35 @@ export const fixExistingPaymentAllocationStatus = async (): Promise<{ success: b
 
 // Interface pour les données de facturation à envoyer au webhook n8n
 export interface InvoiceDataForWebhook {
-  master_id: string
+  // Informations de facturation
+  client_name: string
+  client_address: string
+  client_city: string
+  invoice_number: string
+  invoice_date: string
+  due_date: string
   dossier_number: string
-  client_name?: string
+  master_id: string
+  
+  // Transport
+  lta_number: string
+  packaging: string
+  routing: string
+  
+  // Lignes de facturation
   invoice_lines: {
     description: string
     quantity: number
     unit_price: number
-    total_price: number
+    tva_rate: number
+    total_ht: number
   }[]
-  total_amount: number
+  
+  // Totaux
+  total_ht: number
+  total_ttc: number
+  
+  // Métadonnées
   created_at: string
   source: string
 }
@@ -764,15 +783,16 @@ export const testWebhookConnectivity = async (): Promise<{ success: boolean; mes
 }
 
 // Function to send invoice data to n8n webhook for PDF generation
-export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook): Promise<{ success: boolean; message: string; response?: any; pdfBlob?: Blob; fileName?: string }> => {
-  const webhookUrl = 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
+export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhook, customWebhookUrl?: string): Promise<{ success: boolean; message: string; response?: any; pdfBlob?: Blob; fileName?: string }> => {
+  const webhookUrl = customWebhookUrl || 'https://n8n.skylogistics.fr/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9'
   
   try {
     console.log('📤 Envoi des données de facturation au webhook n8n:', invoiceData)
     console.log('🔗 URL du webhook:', webhookUrl)
     
     // Utiliser le proxy local Vite en priorité
-    const localProxyUrl = `/n8n-webhook/webhook-test/490100a6-95d3-49ef-94a6-c897856cf9c9`
+    const webhookPath = new URL(webhookUrl).pathname
+    const localProxyUrl = `/n8n-webhook${webhookPath}`
     console.log('🔄 Utilisation du proxy local Vite:', localProxyUrl)
     
     const response = await fetch(localProxyUrl, {
@@ -838,23 +858,81 @@ export const sendInvoiceDataToWebhook = async (invoiceData: InvoiceDataForWebhoo
     }
     
   } catch (error) {
-    console.error('❌ Erreur lors de l\'envoi au webhook n8n:', error)
+    console.error('❌ Erreur lors de l\'envoi au webhook n8n via proxy local:', error)
     
-    // Détails de l'erreur selon le type
-    let errorDetails = 'Erreur inconnue'
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        errorDetails = 'Timeout de la requête (30s dépassé)'
-      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorDetails = 'Erreur de réseau ou CORS'
-      } else {
-        errorDetails = error.message
+    // Essayer avec le proxy CORS externe en fallback
+    try {
+      console.log('🔄 Tentative avec proxy CORS externe...')
+      const corsProxyUrl = `https://cors-anywhere.herokuapp.com/${webhookUrl}`
+      
+      const response = await fetch(corsProxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/pdf, application/json, */*',
+          'Origin': 'http://localhost:5173'
+        },
+        body: JSON.stringify(invoiceData),
+        signal: AbortSignal.timeout(30000)
+      })
+      
+      console.log('📥 Statut de la réponse via proxy CORS:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`)
       }
-    }
-    
-    return {
-      success: false,
-      message: `Erreur lors de l'envoi au webhook: ${errorDetails}`
+      
+      // Traiter la réponse de la même manière
+      const contentType = response.headers.get('content-type')
+      const isPDF = contentType && (contentType.includes('application/pdf') || contentType.includes('binary') || contentType.includes('octet-stream'))
+      
+      if (isPDF) {
+        const pdfBlob = await response.blob()
+        const fileName = `facture_${invoiceData.master_id}_${Date.now()}.pdf`
+        
+        console.log('✅ PDF binaire reçu avec succès via proxy CORS')
+        return {
+          success: true,
+          message: 'Facture PDF générée avec succès via proxy CORS',
+          pdfBlob,
+          fileName
+        }
+      } else {
+        const responseText = await response.text()
+        let responseData
+        try {
+          responseData = JSON.parse(responseText)
+        } catch (parseError) {
+          responseData = { message: responseText }
+        }
+        
+        console.log('✅ Données envoyées avec succès via proxy CORS')
+        return {
+          success: true,
+          message: 'Facture envoyée au webhook n8n avec succès via proxy CORS',
+          response: responseData
+        }
+      }
+      
+    } catch (corsError) {
+      console.error('❌ Erreur avec tous les proxies:', corsError)
+      
+      // Détails de l'erreur selon le type
+      let errorDetails = 'Erreur inconnue'
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorDetails = 'Timeout de la requête (30s dépassé)'
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorDetails = 'Erreur de réseau ou CORS'
+        } else {
+          errorDetails = error.message
+        }
+      }
+      
+      return {
+        success: false,
+        message: `Erreur lors de l'envoi au webhook: ${errorDetails}`
+      }
     }
   }
 }

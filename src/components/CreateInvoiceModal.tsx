@@ -14,7 +14,6 @@ interface InvoiceData {
   // Card 1: Informations de facturation
   clientName: string;
   clientAddress: string;
-  clientPostalCode: string;
   clientCity: string;
   invoiceNumber: string;
   invoiceDate: string;
@@ -43,7 +42,6 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     clientName: '',
     clientAddress: '',
-    clientPostalCode: '',
     clientCity: '',
     invoiceNumber: '',
     invoiceDate: new Date().toISOString().split('T')[0],
@@ -86,6 +84,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
         clientName: mainData.client_name || prev.clientName,
         clientAddress: mainData.client_adresse || prev.clientAddress,
         clientCity: mainData.client_city || prev.clientCity,
+        invoiceNumber: mainData.next_invoice_number || prev.invoiceNumber,
         dossierNumber: mainData.master_id || prev.dossierNumber,
         
         // Card 2: Transport
@@ -108,6 +107,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
         clientName: mainData.client_name,
         clientAddress: mainData.client_adresse,
         clientCity: mainData.client_city,
+        invoiceNumber: mainData.next_invoice_number,
         dossierNumber: mainData.master_id,
         ltaNumber: mainData.lta,
         packaging: mainData.hum_name,
@@ -195,23 +195,46 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
     setMessage('');
 
     try {
-      // Préparer les données pour le webhook selon l'interface attendue
+      // Préparer toutes les données pour le webhook
       const webhookData = {
-        master_id: invoiceData.dossierNumber,
-        dossier_number: invoiceData.dossierNumber,
+        // Informations de facturation
         client_name: invoiceData.clientName,
+        client_address: invoiceData.clientAddress,
+        client_city: invoiceData.clientCity,
+        invoice_number: invoiceData.invoiceNumber,
+        invoice_date: invoiceData.invoiceDate,
+        due_date: invoiceData.dueDate,
+        dossier_number: invoiceData.dossierNumber,
+        master_id: invoiceData.dossierNumber,
+        
+        // Transport
+        lta_number: invoiceData.ltaNumber,
+        packaging: invoiceData.packaging,
+        routing: invoiceData.routing,
+        
+        // Lignes de facturation
         invoice_lines: invoiceData.invoiceLines.map(line => ({
           description: line.description,
           quantity: line.quantity,
           unit_price: line.unitPrice,
-          total_price: line.totalHT
+          tva_rate: line.tvaRate,
+          total_ht: line.totalHT
         })),
-        total_amount: calculateTotalTTC(),
+        
+        // Totaux
+        total_ht: calculateTotalHT(invoiceData.invoiceLines),
+        total_ttc: calculateTotalTTC(),
+        
+        // Métadonnées
         created_at: new Date().toISOString(),
         source: 'SkyLogistics WebApp - Modal Création'
       };
 
-      const result = await sendInvoiceDataToWebhook(webhookData);
+      // Appeler le webhook spécifié avec toutes les données
+      const result = await sendInvoiceDataToWebhook(
+        webhookData,
+        'https://n8n.skylogistics.fr/webhook/490100a6-95d3-49ef-94a6-c897856cf9c9'
+      );
       
       if (result.success && result.pdfBlob) {
         // Notifier le composant parent de la génération réussie
@@ -286,18 +309,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ isOpen, onClose
                   placeholder="Adresse complète"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Code postal
-                </label>
-                <input
-                  type="text"
-                  value={invoiceData.clientPostalCode}
-                  onChange={(e) => setInvoiceData(prev => ({ ...prev, clientPostalCode: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="75001"
-                />
-              </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Ville
